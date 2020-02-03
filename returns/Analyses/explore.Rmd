@@ -14,7 +14,7 @@ library(tidyverse)
 library(funModeling)
 library(lubridate)
 library(gridExtra)
-load("Data/PetPoint_data.Rdata")
+load("../Data/PetPoint_data.Rdata")
 ```
 
 ## 0. Date clean
@@ -22,7 +22,7 @@ Data clean include 1) convert missing value 2) convert variable type 3) rename v
 
 ```{r data-clean, message=F, warning=F, results='hide'}
 ################# clean byAnimal ########################
-PetPoint_byAnimal = read_delim("Data/PetPoint_byAnimal.csv", delim=",")
+PetPoint_byAnimal = read_delim("../Data/PetPoint_byAnimal.csv", delim=",")
 
 # remove columns have single value
 PetPoint_byAnimal = PetPoint_byAnimal %>% 
@@ -73,7 +73,7 @@ PetPoint_byAnimal = PetPoint_byAnimal %>%
 
 
 ################## clean byPerson ####################
-PetPoint_byPerson = read_delim("Data/PetPoint_byPerson.csv", delim=",")
+PetPoint_byPerson = read_delim("../Data/PetPoint_byPerson.csv", delim=",")
 
 # remove columns have single value
 PetPoint_byPerson = PetPoint_byPerson %>% 
@@ -143,7 +143,7 @@ var_keep = df_status(PetPoint) %>% tbl_df %>%
         filter(p_na < 50) %>% pull(variable)
 PetPoint = PetPoint[var_keep]
 
-save(PetPoint, PetPoint_byAnimal, PetPoint_byPerson, file="Data/PetPoint_data.Rdata")
+save(PetPoint, PetPoint_byAnimal, PetPoint_byPerson, file="../Data/PetPoint_data.Rdata")
 
 ```
 
@@ -192,7 +192,7 @@ ggplot(df, aes(x=factor(record_n),y=animal_n, fill=Species)) +
 
 ```
 
-There are 6687 in-and-out records of PAWS from 1/15/2018-1/15/2020. It involved 6330 animals, including 5599 cats and 731 dogs. Out of 6330 animals, 6329 animals that were adopted from last two years. 6.7% (378) cats and 10.8% (79) dogs have experienced return to PAWS after adoption. 39 animals have been returned more than once. Since the project is to study animal return, we will focused on returned animals in the following EDA, from the aspects of "return reason", "return time span" and ""
+There are 6687 in-and-out records of PAWS from 1/15/2018-1/15/2020. It involved 6330 animals, including 5599 cats and 731 dogs. Out of 6330 animals, 6329 animals that were adopted from last two years. 6.7% (378) cats and 10.8% (79) dogs have experienced return to PAWS after adoption. 39 animals have been returned more than once. Since the project is to study animal return, we will focused on returned animals in the following EDA, from the aspects of "return reason", "return time span" and "the person who returns animals".
 
 ## 2. Animal return reasons
 
@@ -476,9 +476,9 @@ out = PetPoint %>%
         group_by(Species, Primary.Breed, mix,hair,size) %>% 
         summarise(animal_n=n_distinct(Animal.ID)) %>% ungroup() %>% 
         arrange(Species)
-write.table(out, file="Data/animal_breed.tsv", sep="\t", row.names = F, quote = F)
+write.table(out, file="../Data/animal_breed.tsv", sep="\t", row.names = F, quote = F)
 
-animal_breed = read_delim("Data/animal_breed_manualUpdated.tsv", delim="\t")
+animal_breed = read_delim("../Data/animal_breed_manualUpdated.tsv", delim="\t")
 
 PetPoint2 = left_join(
         PetPoint2 %>% 
@@ -491,7 +491,7 @@ PetPoint2 = left_join(
 # create target variable return
 PetPoint2 =  PetPoint2 %>% mutate(return=ifelse(is.na(return_time_lapse), "NO", "YES"))
 
-save(PetPoint, PetPoint_byAnimal, PetPoint_byPerson, PetPoint2, animal_breed, file="Data/PetPoint_data.Rdata")
+save(PetPoint, PetPoint_byAnimal, PetPoint_byPerson, PetPoint2, animal_breed, file="../Data/PetPoint_data.Rdata")
 
 ```
 
