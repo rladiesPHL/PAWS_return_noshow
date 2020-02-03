@@ -1,0 +1,551 @@
+---
+title: "explore.Rmd"
+author: "Chun Su"
+date: "1/29/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, echo=F, message=F}
+library(tidyverse)
+library(funModeling)
+library(lubridate)
+library(gridExtra)
+load("Data/PetPoint_data.Rdata")
+```
+
+## 0. Date clean
+Data clean include 1) convert missing value 2) convert variable type 3) rename variables 4) remove variables with single unique value 5) merge tables
+
+```{r data-clean, message=F, warning=F, results='hide'}
+################# clean byAnimal ########################
+PetPoint_byAnimal = read_delim("Data/PetPoint_byAnimal.csv", delim=",")
+
+# remove columns have single value
+PetPoint_byAnimal = PetPoint_byAnimal %>% 
+        select_if(function(x){length(unique(x)) > 1})
+
+# # check each column possible values
+# column_exp = lapply(
+#         colnames(PetPoint_byAnimal),
+#         function(x){
+#                 head(unique(PetPoint_byAnimal %>% pull(x)))
+#         }
+# )
+# names(column_exp) = colnames(PetPoint_byAnimal)
+# 
+# column_unique_value_n = lapply(
+#         colnames(PetPoint_byAnimal),
+#         function(x){
+#                 length(unique(PetPoint_byAnimal %>% pull(x)))
+#         }
+# )
+# names(column_unique_value_n) = colnames(PetPoint_byAnimal)
+
+# remove other columns containing repeative information, unknown info
+PetPoint_byAnimal = PetPoint_byAnimal %>% 
+        select(-contains("Agency"), -ARN, -Released.By, -Release.Date, -Outcome.Age, -LOS, -Intake.Age, -Outcome.Age.in.Months) 
+
+# fix column name
+PetPoint_byAnimal = PetPoint_byAnimal %>% 
+        dplyr::rename(Animal.ID=Animal..)
+
+# fix missing data
+PetPoint_byAnimal = PetPoint_byAnimal %>% mutate(Gender=ifelse(Gender=="Unknown", NA, Gender))
+PetPoint_byAnimal = PetPoint_byAnimal %>% mutate(Altered=ifelse(Altered=="Unknown", NA, Altered))
+
+# column type fix (factors, Dates)
+PetPoint_byAnimal = PetPoint_byAnimal %>% 
+        mutate_if(function(x){length(unique(x)) <=10}, as.factor) %>% 
+        mutate_at(vars(contains("Date")), function(x){parse_date_time(x, c("%m/%d/%Y", "%m/%d/%Y %H:%M:%S %p"), tz=Sys.timezone(location = TRUE))}) %>%
+        mutate(Intake.Date=floor_date(Intake.Date, unit="minute")) %>% 
+        mutate(Outcome.Date=floor_date(Outcome.Date, unit="minute")) %>% 
+        mutate(Date.of.Birth=as.Date(Date.of.Birth))
+
+# recalculate intake outcome age in month and LOS in day
+PetPoint_byAnimal = PetPoint_byAnimal %>% 
+        mutate(Intake.Age.in.Months=round(as.numeric(as.Date(Intake.Date)-Date.of.Birth)/30)) %>% 
+        mutate(Outcome.Age.in.Months=round(as.numeric(as.Date(Outcome.Date)-Date.of.Birth)/30)) %>% 
+        mutate(LOS=as.numeric(as.Date(Outcome.Date)-as.Date(Intake.Date)))
+
+
+################## clean byPerson ####################
+PetPoint_byPerson = read_delim("Data/PetPoint_byPerson.csv", delim=",")
+
+# remove columns have single value
+PetPoint_byPerson = PetPoint_byPerson %>% 
+        select_if(function(x){length(unique(x)) > 1})
+
+# # check each column possible values
+# column_exp = lapply(
+#         colnames(PetPoint_byPerson),
+#         function(x){
+#                 head(unique(PetPoint_byPerson %>% pull(x)))
+#         }
+# )
+# names(column_exp) = colnames(PetPoint_byPerson)
+# 
+# column_unique_value_n = lapply(
+#         colnames(PetPoint_byPerson),
+#         function(x){
+#                 length(unique(PetPoint_byPerson %>% pull(x)))
+#         }
+# )
+# names(column_unique_value_n) = colnames(PetPoint_byPerson)
+
+# remove repeative and unknown information
+PetPoint_byPerson = PetPoint_byPerson %>% 
+        select(-contains("Consent")) %>% 
+        select(-City.Alias,-Jurisdiction,-Age.As.Months,-Person.Creation.Date,-ARN,-PetID)
+
+PetPoint_byPerson = PetPoint_byPerson %>% 
+        select(-Microchip.Issuer,-Location,-Site,-Primary.Breed,-Secondary.Breed,-Sex, -Primary.Colour,-Spayed.Neutered)
+
+# rename Gender, Operation.* 
+PetPoint_byPerson = PetPoint_byPerson %>% 
+        dplyr::rename(Person.Gender=Gender) %>% 
+        dplyr::rename(Outcome.Subtype=Operation.Subtype, Outcome.Date=Operation.Date) %>% 
+        select(-Operation.By)
+
+# fix Body.Weight
+PetPoint_byPerson = PetPoint_byPerson %>% 
+        mutate(Body.Weight=ifelse(Body.Weight==0,NA,Body.Weight)) %>% 
+        mutate(Body.Weight=ifelse(is.na(Body.Weight.Unit),NA,Body.Weight))
+
+# convert missing data
+PetPoint_byPerson = PetPoint_byPerson %>% 
+        mutate(Person.Gender=gsub(" ","",Person.Gender)) %>% 
+        mutate(Person.Gender=ifelse(Person.Gender=="0", NA, Person.Gender))
+
+# fix variable type
+PetPoint_byPerson = PetPoint_byPerson %>%
+        mutate_if(function(x){length(unique(x)) <=10}, as.factor) %>% 
+        mutate_at(vars(contains("Date")), function(x){parse_date_time(x, c("%m/%d/%Y %H:%M %p", "%m/%d/%Y %H:%M %p"))}) %>% 
+        mutate(Date.Of.Birth=as.Date(Date.Of.Birth)) %>% 
+        dplyr::rename(Date.of.Birth=Date.Of.Birth)
+PetPoint_byPerson = PetPoint_byPerson %>% 
+        mutate(Postal.Code=as.character(Postal.Code))
+
+
+######################## join tables ###########################
+PetPoint = full_join(
+        PetPoint_byAnimal %>% 
+                mutate(Outcome.Date=format(as.POSIXct(Outcome.Date), "%m/%d/%Y %H:%M")),
+        PetPoint_byPerson %>% 
+                mutate(Outcome.Date=format(as.POSIXct(Outcome.Date), "%m/%d/%Y %H:%M"))
+) %>% mutate(Outcome.Date=parse_date_time(Outcome.Date,"%m/%d/%Y %H:%M",tz=Sys.timezone(location = TRUE))) 
+
+# remove variables with more than 50% missing value
+var_keep = df_status(PetPoint) %>% tbl_df %>% 
+        filter(p_na < 50) %>% pull(variable)
+PetPoint = PetPoint[var_keep]
+
+save(PetPoint, PetPoint_byAnimal, PetPoint_byPerson, file="Data/PetPoint_data.Rdata")
+
+```
+
+## 1. Global view of PetPoint data
+
+We start exploratory data analysis (EDA) by examining all variables
+
+```{r global-animal, message=FALSE}
+# quick global view
+df_status(PetPoint)
+
+
+# animal and record number per species within record
+PetPoint %>% group_by(Species) %>% 
+        summarise(
+                animal_n=n_distinct(Animal.ID), 
+                record_n=n_distinct(row_number())
+                )
+# animal and record number per species per Intake.Type within record
+PetPoint %>% 
+        group_by(Species, Intake.Type) %>% 
+        summarise(animal_n=n_distinct(Animal.ID), 
+                record_n=n_distinct(row_number())) %>% 
+        ungroup()
+
+# plot return times
+df = left_join(
+        PetPoint %>% 
+                select(Animal.ID, Species) %>% 
+                distinct(),
+        PetPoint %>% filter(Intake.Type=="Return") %>% 
+                select(Animal.ID, Species, Return.Date=Intake.Date, Outcome.Date) %>% 
+        group_by(Animal.ID, Species) %>% 
+        summarise(record_n=n_distinct(row_number())) %>% 
+        ungroup()
+) %>% mutate(record_n=ifelse(is.na(record_n),0, record_n))
+df = df %>% group_by(Species, record_n) %>% 
+        summarise(animal_n = n_distinct(Animal.ID))
+ggplot(df, aes(x=factor(record_n),y=animal_n, fill=Species)) +
+        facet_wrap(~Species) +
+        geom_bar(stat="identity") +
+        geom_text(aes(label=animal_n), vjust=-0.5) +
+        xlab("return times") +
+        ylab("number of animal") +
+        theme(legend.position = "none")
+
+```
+
+There are 6687 in-and-out records of PAWS from 1/15/2018-1/15/2020. It involved 6330 animals, including 5599 cats and 731 dogs. Out of 6330 animals, 6329 animals that were adopted from last two years. 6.7% (378) cats and 10.8% (79) dogs have experienced return to PAWS after adoption. 39 animals have been returned more than once. Since the project is to study animal return, we will focused on returned animals in the following EDA, from the aspects of "return reason", "return time span" and ""
+
+## 2. Animal return reasons
+
+```{r return-reason, message=FALSE}
+# inspect return reasons for animal return and classify it to owner-side or animal-side
+Return.Reason =  PetPoint %>% filter(Intake.Type=="Return") %>% 
+        distinct(Intake.Reason) %>% 
+        mutate(Return.Reason.Group=c("owner-side","owner-side","owner-side","owner-side","animal-side","owner-side","owner-side","animal-side","animal-side","owner-side","animal-side","owner-side","animal-side","animal-side","animal-side","animal-side","owner-side","owner-side","owner-side","animal-side","owner-side","owner-side","owner-side","animal-side","owner-side","animal-side","animal-side","animal-side","owner-side","animal-side","owner-side","owner-side","animal-side","animal-side"))
+
+Return.Reason %>% as.data.frame()
+
+# top 10 reason sorted by returned animal number per species
+df = PetPoint %>% filter(Intake.Type=="Return") %>% 
+        select(Animal.ID, Species, Intake.Reason) %>% 
+        distinct() %>% 
+        group_by(Species, Intake.Reason) %>% 
+        summarise(animal_n=n_distinct(Animal.ID)) %>% 
+        top_n(n = 10, wt = animal_n) %>% 
+        ungroup() %>% 
+        arrange(Species, animal_n) %>%
+        mutate(order=row_number())
+# calculate the animal percentage for each reason
+df = left_join(
+        df, 
+        PetPoint %>% filter(Intake.Type=="Return") %>% 
+                group_by(Species) %>% 
+                summarise(total=n_distinct(Animal.ID))
+) %>% mutate(animal_perc=animal_n/total*100)
+
+# add reason group
+df = left_join(df, Return.Reason)
+ggplot(df %>% filter(), aes(x=order, y=animal_perc, fill=Return.Reason.Group)) +
+        facet_wrap(~Species, scales = "free") +
+        geom_col()+
+        coord_flip() +
+        scale_x_continuous(
+                breaks = df$order,
+                labels = df$Intake.Reason,
+                expand = c(0,0)
+        ) +
+        ylab("Percentage of total returned animal within species (%)")+
+        xlab("Return.Reason") +
+        theme(legend.position = "bottom")
+        
+```
+To explore the 34 recorded reasons that an animal got returned back to PAWS, "moving" is the top reason contributing to cat return while "Behavior Issues" for dog return. We further carefully classified those reasons to mainly from "owner-side" and from "animal-side". eg. we would consider "moving", "too many aniamls" and "Divorce / Separation" as "owner-side" reason, while "aggression to animal", "too active" and "behavior issue" as "animal-side" reason. Based on 34 recorded reasons, we found 16 can be devoted as "animal-side" reasons while 18 as "owner-side" reasons.
+
+Among the top 10 return reasons for both cat and dog, more than half of cases are from adopter side, like "moving", "unreleasitic expectation", " allergic to animal" and "health of owner or family", "landload issue" and "change of lifestyle". Vagues term "unreleasitic expectation" are equally important reasons for both cat and dog.
+
+```{r multiple-return-reason, message=F}
+# animal returned multiple times
+df = PetPoint %>% filter(Intake.Type=="Return") %>% 
+        select(Animal.ID, Species, Intake.Date) %>% 
+        group_by(Animal.ID, Species) %>% 
+        summarise(return_n=n_distinct(Intake.Date)) %>% 
+        ungroup() %>% 
+        filter(return_n > 1)
+# Intake.Reason for multi-returned animals
+df = semi_join(
+        PetPoint %>% filter(Intake.Type=="Return") %>% 
+                select(Animal.ID, Species, Intake.Reason, Intake.Date),
+        df
+) %>% arrange(Species, Animal.ID)
+
+# add return reason group info
+df = left_join(df, Return.Reason)
+
+# the animal returned with always animal-side reasons
+animals = semi_join(
+        df %>% 
+        distinct(Species, Animal.ID,Return.Reason.Group) %>% 
+        filter(Return.Reason.Group=="animal-side"),
+df %>% 
+        distinct(Species, Animal.ID,Return.Reason.Group) %>% 
+        group_by(Species, Animal.ID) %>% 
+        summarise(return_reason_type_n=n_distinct(Return.Reason.Group)) %>% 
+        ungroup() %>% 
+        filter(return_reason_type_n==1)
+)
+
+df %>% filter(Animal.ID %in% (animals %>% pull(Animal.ID)))
+
+```
+
+Focusing on the animal returned to PAWS multiple times, we are wondering whether those animal were always returned with animal-side reasons. Out of 39 multiple-times-returned animals, only 3 (cat A15451188, A38026544 and A42298667) were returned with always animal-side reasons. Only cat A38026544 were returned for the exactly same reason (Not Housebroken / Housesoiling). 
+
+All together, it suggests that reason for returning animals are not largely dependent on animals. "Unrealistic expectation" and Adopter life-change (eg, "moving", "change in lifestyle" and "health of owner/family") are important reasons for animal returning from owner-side.
+
+## 3. Animal return time span
+
+```{r}
+return_records = left_join(
+        PetPoint %>% 
+                select(Animal.ID, Species, Adoption.Date=Outcome.Date),
+        PetPoint %>% filter(Intake.Type=="Return") %>% 
+                select(Animal.ID, Return.Date=Intake.Date)
+) %>% 
+        filter(!is.na(Return.Date))
+
+return_records = return_records %>% 
+        arrange(Adoption.Date,Return.Date) %>% 
+        group_by(Animal.ID, Species, Adoption.Date) %>% 
+        summarise(Return.Date=min(Return.Date)) %>% 
+        ungroup()
+
+return_records = return_records %>% 
+        mutate(time_lapse=difftime(Return.Date,Adoption.Date, units = "min")) %>% 
+        filter(time_lapse > 0)
+
+# add return reasons to return records
+return_records = left_join(
+        return_records, 
+        PetPoint %>% 
+                filter(Intake.Type=="Return") %>% 
+                select(Animal.ID, Return.Date=Intake.Date,Intake.Reason)
+)
+
+# plot adoption-return time
+df = return_records %>% 
+        mutate(time_lapse=as.numeric(time_lapse)) %>% 
+        mutate(time_lapse=time_lapse/(60*24))
+
+ggplot(df, aes(time_lapse)) +
+        geom_histogram(binwidth=1) +
+        geom_density() +
+        xlab("days from adoption to return") +
+        ylab("return event frequency")
+
+summary(df$time_lapse)
+
+df %>% filter(time_lapse < 1) %>% 
+        mutate(day_lapse=as.numeric(as.Date(Return.Date)-as.Date(Adoption.Date))) %>% 
+        filter(day_lapse < 1)
+```
+
+To estimate the time span from adoption to return based on those 457 animals, we performed inter-record check and found 289 animals (232 cats and 57 dogs) have previous adoption history in this 2-year records. More 75% animal were returned within 90 days, although there are several animals were not returned until one and half year later. 
+
+
+```{r day_lapse_lessthan_1hour}
+df %>% filter(time_lapse < 1/24) %>% 
+        mutate(time_lapse=Return.Date-Adoption.Date)
+
+PetPoint %>% filter(Animal.ID=="A41607752") %>% 
+        select(Animal.ID, Intake.Date, Intake.Reason, Outcome.Date, Person.ID) %>% 
+        arrange(Intake.Date)
+```
+
+There are 17 return event happens within 1 hour, with out-system-time-span ranging from 1 mins to 32 mins. Eg. Animal A41607752 was adopted at 2019-05-19 17:16:00 by Person P33238749. She was returned at 1 min later (2019-05-19 17:17:00) for the reason of "Aggression to Animals". This short time for return is unreleastic for owner to determine whether an animal is aggressive to other animals or not. We are suspicious that it is a recording error.
+
+## 4. The person who returned aniamls
+```{r person_who_return}
+# add person information to return records
+return_records_withPerson=left_join(
+        return_records,
+        PetPoint %>% select(Animal.ID, Adoption.Date=Outcome.Date, Person.ID)
+)
+
+return_records_withPerson %>% 
+        summarise(person_return_n=n_distinct(Person.ID))
+
+
+# plot return_event_n_per_person distribution
+df = left_join(
+        PetPoint %>% 
+                distinct(Person.ID),
+        return_records_withPerson %>% 
+        group_by(Person.ID) %>% 
+        summarise(return_event_n=n_distinct(row_number())) %>% 
+        ungroup()
+) %>% mutate(return_event_n=ifelse(is.na(return_event_n),0,return_event_n))
+
+ggplot(df %>% 
+        group_by(return_event_n) %>% 
+        summarise(person_n=n_distinct(Person.ID)), aes(x=factor(return_event_n),y=person_n)) +
+        geom_bar(stat="identity") +
+        geom_text(aes(label=person_n), vjust=-0.5) +
+        xlab("number of return event per person") +
+        ylab("number of person")
+
+# Worst person
+semi_join(
+        return_records_withPerson,
+        df %>% filter(return_event_n==3)
+)
+
+# how many people with multiple return events because of adopting two animals at same time(day).
+semi_join(
+        return_records_withPerson,
+        df %>% filter(return_event_n>1)
+) %>% mutate(Adoption.Date=as.Date(Adoption.Date)) %>% 
+        group_by(Adoption.Date, Person.ID) %>% 
+        summarise(animal_n=n_distinct(Animal.ID)) %>% 
+        ungroup() %>% 
+        filter(animal_n > 1)
+
+# how many people with adopting two animals at same time(day) returned both at same time.
+semi_join(
+        semi_join(
+        return_records_withPerson,
+        df %>% filter(return_event_n>1)
+) %>% mutate(Return.Date=as.Date(Return.Date)) %>% 
+        group_by(Return.Date, Person.ID) %>% 
+        summarise(animal_n=n_distinct(Animal.ID)) %>% 
+        ungroup() %>% 
+        filter(animal_n > 1),
+        semi_join(
+        return_records_withPerson,
+        df %>% filter(return_event_n>1)
+) %>% mutate(Adoption.Date=as.Date(Adoption.Date)) %>% 
+        group_by(Adoption.Date, Person.ID) %>% 
+        summarise(animal_n=n_distinct(Animal.ID)) %>% 
+        ungroup() %>% 
+        filter(animal_n > 1) %>% distinct(Person.ID)
+)
+
+semi_join(
+        return_records_withPerson,
+        df %>% filter(return_event_n>1)
+) %>% mutate(Return.Date=as.Date(Return.Date)) %>% 
+        group_by(Return.Date, Person.ID,Intake.Reason) %>% 
+        summarise(animal_n=n_distinct(Animal.ID)) %>% 
+        ungroup() %>% 
+        filter(animal_n > 1)
+
+# for the people returned animals, How many did they finally own an animal (with 2 year records)?
+anti_join(
+        semi_join(
+                PetPoint %>% 
+                        distinct(Person.ID, Animal.ID),
+                df %>% filter(return_event_n > 0)
+        ),
+        return_records_withPerson %>% 
+                distinct(Person.ID, Animal.ID)
+) %>% distinct(Person.ID)
+
+
+```
+
+In the past two years, 5731 people adopted aniamls from PAWS. 255 (4.4%) people returned animals at least once and 23 of them have more than one returning records. One person who has 3 return event records (P30835108) adopted one cat (A38516357) at first time (2018-06-30) and returned it after 78 days (2018-09-16) for the reason of "Too Much Responsibility". On the same day of return, she adopted two cats ("A39180514" and "A39180516"). About one year later, she returned those two because of "moving". 
+
+Among those 23 people who have more than one returning records, 78% (18) of them adopted two animals at one time. 16 of them returned both animals at same time too, most (14 out of 16) of them for owner-side reasons (Health of Owner/Family, Allergic to Animal, Moving, Not Enough Time). 
+
+To estimate whether the people with returning records can finally keep an animal or not, we explored how many of those people finally did own an animal from PAWS with 2 year records. 34 out of 255 (13.3%) people finally found their "densitiny" animals from PAWS and kept them.
+
+
+## 5. variables contributing to animal returns
+This part is to looking for the variables for next modeling step, using whether it is returned (return_time_lapse) after adoption as target variables. We focused on 6329 animals that were adopted from last two years. We selected all relevant variables based from available variables and created certain variables based on common sense. The variables can generally be grouped to animal-side variables and person-side variables.
+
+```{r prepare_model_df, message=F}
+# available variables (6,686)
+PetPoint2 = PetPoint_byPerson %>% distinct(Animal.ID, Adoption.Date=Outcome.Date, Person.ID, Person.Gender, City, Province.Abbr, Postal.Code)
+PetPoint2 = left_join(
+        PetPoint2 %>% 
+                mutate(Adoption.Date=format(as.POSIXct(Adoption.Date), "%m/%d/%Y %H:%M")),
+        PetPoint_byAnimal %>% distinct(Animal.ID, Adoption.Date=Outcome.Date, Outcome.Site, Outcome.Age.in.Months, Species, Primary.Breed, Colors, Gender, Altered, Intake.Type, Intake.Reason, Intake.Age.in.Months, LOS) %>% 
+                mutate(Adoption.Date=format(as.POSIXct(Adoption.Date), "%m/%d/%Y %H:%M"))
+) %>% mutate(Adoption.Date=parse_date_time(Adoption.Date,"%m/%d/%Y %H:%M",tz=Sys.timezone(location = TRUE))) 
+
+# add target variable return_time_lapse
+PetPoint2 = left_join(
+        PetPoint2 %>% 
+                mutate(Adoption.Date=format(as.POSIXct(Adoption.Date), "%m/%d/%Y %H:%M")),
+        return_records %>% select(Animal.ID, Adoption.Date, return_time_lapse=time_lapse) %>% 
+                mutate(Adoption.Date=format(as.POSIXct(Adoption.Date), "%m/%d/%Y %H:%M"))
+) %>% mutate(Adoption.Date=parse_date_time(Adoption.Date,"%m/%d/%Y %H:%M",tz=Sys.timezone(location = TRUE))) 
+
+# manually convert Primary.Breed to three variables (size, hair, mix)
+out = PetPoint %>% 
+        mutate(Primary.Breed=tolower(Primary.Breed)) %>% 
+        mutate(mix=ifelse(grepl("domestic|,", Primary.Breed), "mix","no-mix")) %>%
+        mutate(hair=case_when(
+                grepl("shorthair",Primary.Breed)~"short",
+                grepl("longhair",Primary.Breed)~"log",
+                grepl("medium hair",Primary.Breed)~"median"
+        )) %>% 
+        mutate(size=case_when(
+                Species=="Dog" & grepl("small",Primary.Breed)~"small",
+                Species=="Dog" & grepl("big",Primary.Breed)~"big",
+                Species=="Dog" & grepl("medium",Primary.Breed)~"median"
+        )) %>% 
+        group_by(Species, Primary.Breed, mix,hair,size) %>% 
+        summarise(animal_n=n_distinct(Animal.ID)) %>% ungroup() %>% 
+        arrange(Species)
+write.table(out, file="Data/animal_breed.tsv", sep="\t", row.names = F, quote = F)
+
+animal_breed = read_delim("Data/animal_breed_manualUpdated.tsv", delim="\t")
+
+PetPoint2 = left_join(
+        PetPoint2 %>% 
+                mutate(Primary.Breed=tolower(Primary.Breed)) ,
+        animal_breed %>% select(-animal_n) %>% 
+                mutate(mix=ifelse(mix=="no-mix","purebreed",mix))
+)
+
+
+# create target variable return
+PetPoint2 =  PetPoint2 %>% mutate(return=ifelse(is.na(return_time_lapse), "NO", "YES"))
+
+save(PetPoint, PetPoint_byAnimal, PetPoint_byPerson, PetPoint2, animal_breed, file="Data/PetPoint_data.Rdata")
+
+```
+
+Exploring every variable-return relationship
+The exploring feature variables are "Person.Gender", "City", "Province.Abbr", "Postal.Code", "Outcome.Site", "Outcome.Age.in.Months", "Species", "Primary.Breed","Colors","Gender","Altered" ,"Intake.Type", "Intake.Reason", "Intake.Age.in.Months" "LOS"
+
+```{r EDA, message=F, fig.height = 7, fig.width = 10, warning=F}
+
+x_vars=c("Person.Gender", "City", "Province.Abbr", "Postal.Code", "Outcome.Site", "Outcome.Age.in.Months", "Species", "size","mix","hair","Colors","Gender","Altered" ,"Intake.Type", "Intake.Reason", "Intake.Age.in.Months", "LOS")
+
+plot_xvar_return <- function(x_var){
+        if(is.numeric(PetPoint2[[x_var]])) {
+        df = PetPoint2 %>% select(one_of(x_var), return) %>% na.omit
+        tmp = split(df[,x_var], df[,"return"])
+        pvalue=round(t.test(unlist(tmp$YES), unlist(tmp$NO))$p.value,3)
+        conf_int=round(t.test(unlist(tmp$YES), unlist(tmp$NO))$conf.int[1:2],1)
+        p = ggplot(df,aes(x=return,fill=return)) +
+               geom_violin(aes_string(y=x_var)) +
+                geom_boxplot(aes_string(y=x_var),fill="white",width=0.1) +
+                labs(
+                        title=x_var, 
+                        subtitle=paste("T-test 95% conf.int", paste(conf_int, collapse="-"), "pvalue", pvalue)
+                        )
+        
+        
+
+        
+}else{
+       df = table(PetPoint2 %>% select(one_of(x_var), return)) 
+       pvalue=round(chisq.test(df)$p.value,3)
+       df = df %>% tbl_df
+       df = left_join(
+               df,
+               df %>% 
+                       group_by_at(x_var) %>% 
+                       summarise(total=sum(n))
+       ) %>% mutate(ratio=n/total)
+       p = ggplot(df,aes_string(x=x_var)) +
+               geom_bar(aes(y=ratio, fill=return), stat="identity") +
+               labs(
+                        title=x_var, 
+                        subtitle=paste("Chi-squared", "pvalue", pvalue)
+                        ) +
+               coord_flip()
+}
+}
+
+vars_to_plot=df_status(PetPoint2) %>% tbl_df %>% 
+        filter(variable %in% x_vars) %>% 
+        filter(type=="numeric" | (type!="numeric" & unique < 10))
+
+ps = lapply(vars_to_plot %>% pull(variable), plot_xvar_return)
+
+do.call("grid.arrange",c(ps, ncol=3))
+```
+
+

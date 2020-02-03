@@ -1,0 +1,89 @@
+Species	Primary.Breed	mix	hair	size	animal_n
+Cat	american shorthair	no-mix	short	NA	55
+Cat	bengal	no-mix	NA	NA	1
+Cat	colourpoint shorthair	no-mix	short	NA	2
+Cat	domestic longhair	mix	log	NA	161
+Cat	domestic medium hair	mix	median	NA	294
+Cat	domestic shorthair	mix	short	NA	5026
+Cat	egyptian mau	no-mix	NA	NA	1
+Cat	european shorthair	no-mix	short	NA	5
+Cat	exotic shorthair	no-mix	short	NA	2
+Cat	havana brown	no-mix	NA	NA	1
+Cat	himalayan	no-mix	NA	NA	1
+Cat	maine coon	no-mix	NA	NA	9
+Cat	oriental shorthair	no-mix	short	NA	1
+Cat	persian	no-mix	NA	NA	2
+Cat	russian blue	no-mix	NA	NA	3
+Cat	siamese	no-mix	NA	NA	34
+Cat	snowshoe	no-mix	NA	NA	1
+Dog	american blue heeler	purebreed	NA	medium	1
+Dog	american eskimo	purebreed	NA	medium	1
+Dog	australian shepherd	purebreed	NA	large	1
+Dog	australian shepherd, miniature	purebreed	NA	medium	1
+Dog	beagle	purebreed	NA	small	8
+Dog	bichon frise	purebreed	NA	small	11
+Dog	border collie	purebreed	NA	medium	2
+Dog	boxer	purebreed	NA	large	4
+Dog	bulldog	purebreed	NA	large	2
+Dog	bulldog, american	purebreed	NA	large	3
+Dog	chihuahua, long coat	purebreed	NA	small	20
+Dog	chihuahua, short coat	purebreed	NA	small	88
+Dog	chow chow	purebreed	NA	large	1
+Dog	collie, smooth	purebreed	NA	large	1
+Dog	dachshund, miniature long haired	purebreed	NA	small	1
+Dog	dachshund, miniature smooth haired	purebreed	NA	small	2
+Dog	dachshund, standard smooth haired	purebreed	NA	small	2
+Dog	german pinscher	purebreed	NA	medium	1
+Dog	german shepherd	purebreed	NA	large	1
+Dog	griffon, brussels	purebreed	NA	small	1
+Dog	havanese	purebreed	NA	small	5
+Dog	hound	mix	NA	medium	4
+Dog	japanese spitz	purebreed	NA	small	1
+Dog	kooikerhondje	purebreed	NA	small	1
+Dog	lhasa apso	purebreed	NA	small	12
+Dog	maltese	purebreed	NA	small	18
+Dog	miniature pinscher	purebreed	NA	small	4
+Dog	mixed breed, large (over 44 lbs fully grown)	mix	NA	large	8
+Dog	mixed breed, medium (up to 44 lbs fully grown)	mix	NA	medium	2
+Dog	mixed breed, small (under 24 lbs fully grown)	mix	NA	small	14
+Dog	norwegian elkhound	purebreed	NA	large	1
+Dog	papillon	purebreed	NA	small	3
+Dog	pekingese	purebreed	NA	small	4
+Dog	pointer, german shorthaired	purebreed	short	large	1
+Dog	pomeranian	purebreed	NA	small	15
+Dog	poodle, miniature	purebreed	NA	small	42
+Dog	poodle, standard	purebreed	NA	large	5
+Dog	poodle, toy	purebreed	NA	small	3
+Dog	pug	purebreed	NA	small	6
+Dog	retriever	mix	NA	large	3
+Dog	retriever, golden	purebreed	NA	large	2
+Dog	retriever, labrador	purebreed	NA	large	11
+Dog	schipperke	purebreed	NA	small	1
+Dog	schnauzer, miniature	purebreed	NA	small	1
+Dog	schnauzer, standard	purebreed	NA	medium	1
+Dog	shepherd	mix	NA	large	7
+Dog	shiba inu	purebreed	NA	small	3
+Dog	shih tzu	purebreed	NA	small	81
+Dog	siberian husky	purebreed	NA	large	1
+Dog	spaniel	mix	NA	medium	7
+Dog	spaniel, american cocker	purebreed	NA	medium	8
+Dog	spaniel, cavalier king charles	purebreed	NA	small	4
+Dog	spaniel, english cocker	purebreed	NA	medium	1
+Dog	terrier	mix	NA	small	96
+Dog	terrier, american pit bull	mix	NA	large	41
+Dog	terrier, american staffordshire	purebreed	NA	large	4
+Dog	terrier, border	purebreed	NA	small	1
+Dog	terrier, boston	purebreed	NA	small	2
+Dog	terrier, bull	purebreed	NA	large	2
+Dog	terrier, cairn	purebreed	NA	small	3
+Dog	terrier, fox, smooth	purebreed	NA	small	1
+Dog	terrier, fox, wire	purebreed	NA	small	1
+Dog	terrier, jack russell	purebreed	NA	small	7
+Dog	terrier, pit bull	mix	NA	large	102
+Dog	terrier, russell	purebreed	NA	small	3
+Dog	terrier, silky	purebreed	NA	small	2
+Dog	terrier, soft coated wheaten	purebreed	NA	medium	1
+Dog	terrier, staffordshire bull	purebreed	NA	medium	3
+Dog	terrier, tibetan	purebreed	NA	medium	1
+Dog	terrier, yorkshire	purebreed	NA	small	28
+Dog	welsh corgi, cardigan	purebreed	NA	medium	1

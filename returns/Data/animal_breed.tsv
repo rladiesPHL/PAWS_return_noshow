@@ -1,0 +1,89 @@
+Species	Primary.Breed	mix	hair	size	animal_n
+Cat	american shorthair	no-mix	short	NA	55
+Cat	bengal	no-mix	NA	NA	1
+Cat	colourpoint shorthair	no-mix	short	NA	2
+Cat	domestic longhair	mix	log	NA	161
+Cat	domestic medium hair	mix	median	NA	294
+Cat	domestic shorthair	mix	short	NA	5026
+Cat	egyptian mau	no-mix	NA	NA	1
+Cat	european shorthair	no-mix	short	NA	5
+Cat	exotic shorthair	no-mix	short	NA	2
+Cat	havana brown	no-mix	NA	NA	1
+Cat	himalayan	no-mix	NA	NA	1
+Cat	maine coon	no-mix	NA	NA	9
+Cat	oriental shorthair	no-mix	short	NA	1
+Cat	persian	no-mix	NA	NA	2
+Cat	russian blue	no-mix	NA	NA	3
+Cat	siamese	no-mix	NA	NA	34
+Cat	snowshoe	no-mix	NA	NA	1
+Dog	american blue heeler	no-mix	NA	NA	1
+Dog	american eskimo	no-mix	NA	NA	1
+Dog	australian shepherd	no-mix	NA	NA	1
+Dog	australian shepherd, miniature	mix	NA	NA	1
+Dog	beagle	no-mix	NA	NA	8
+Dog	bichon frise	no-mix	NA	NA	11
+Dog	border collie	no-mix	NA	NA	2
+Dog	boxer	no-mix	NA	NA	4
+Dog	bulldog	no-mix	NA	NA	2
+Dog	bulldog, american	mix	NA	NA	3
+Dog	chihuahua, long coat	mix	NA	NA	20
+Dog	chihuahua, short coat	mix	NA	NA	88
+Dog	chow chow	no-mix	NA	NA	1
+Dog	collie, smooth	mix	NA	NA	1
+Dog	dachshund, miniature long haired	mix	NA	NA	1
+Dog	dachshund, miniature smooth haired	mix	NA	NA	2
+Dog	dachshund, standard smooth haired	mix	NA	NA	2
+Dog	german pinscher	no-mix	NA	NA	1
+Dog	german shepherd	no-mix	NA	NA	1
+Dog	griffon, brussels	mix	NA	NA	1
+Dog	havanese	no-mix	NA	NA	5
+Dog	hound	no-mix	NA	NA	4
+Dog	japanese spitz	no-mix	NA	NA	1
+Dog	kooikerhondje	no-mix	NA	NA	1
+Dog	lhasa apso	no-mix	NA	NA	12
+Dog	maltese	no-mix	NA	NA	18
+Dog	miniature pinscher	no-mix	NA	NA	4
+Dog	mixed breed, large (over 44 lbs fully grown)	mix	NA	NA	8
+Dog	mixed breed, medium (up to 44 lbs fully grown)	mix	NA	median	2
+Dog	mixed breed, small (under 24 lbs fully grown)	mix	NA	small	14
+Dog	norwegian elkhound	no-mix	NA	NA	1
+Dog	papillon	no-mix	NA	NA	3
+Dog	pekingese	no-mix	NA	NA	4
+Dog	pointer, german shorthaired	mix	short	NA	1
+Dog	pomeranian	no-mix	NA	NA	15
+Dog	poodle, miniature	mix	NA	NA	42
+Dog	poodle, standard	mix	NA	NA	5
+Dog	poodle, toy	mix	NA	NA	3
+Dog	pug	no-mix	NA	NA	6
+Dog	retriever	no-mix	NA	NA	3
+Dog	retriever, golden	mix	NA	NA	2
+Dog	retriever, labrador	mix	NA	NA	11
+Dog	schipperke	no-mix	NA	NA	1
+Dog	schnauzer, miniature	mix	NA	NA	1
+Dog	schnauzer, standard	mix	NA	NA	1
+Dog	shepherd	no-mix	NA	NA	7
+Dog	shiba inu	no-mix	NA	NA	3
+Dog	shih tzu	no-mix	NA	NA	81
+Dog	siberian husky	no-mix	NA	NA	1
+Dog	spaniel	no-mix	NA	NA	7
+Dog	spaniel, american cocker	mix	NA	NA	8
+Dog	spaniel, cavalier king charles	mix	NA	NA	4
+Dog	spaniel, english cocker	mix	NA	NA	1
+Dog	terrier	no-mix	NA	NA	96
+Dog	terrier, american pit bull	mix	NA	NA	41
+Dog	terrier, american staffordshire	mix	NA	NA	4
+Dog	terrier, border	mix	NA	NA	1
+Dog	terrier, boston	mix	NA	NA	2
+Dog	terrier, bull	mix	NA	NA	2
+Dog	terrier, cairn	mix	NA	NA	3
+Dog	terrier, fox, smooth	mix	NA	NA	1
+Dog	terrier, fox, wire	mix	NA	NA	1
+Dog	terrier, jack russell	mix	NA	NA	7
+Dog	terrier, pit bull	mix	NA	NA	102
+Dog	terrier, russell	mix	NA	NA	3
+Dog	terrier, silky	mix	NA	NA	2
+Dog	terrier, soft coated wheaten	mix	NA	NA	1
+Dog	terrier, staffordshire bull	mix	NA	NA	3
+Dog	terrier, tibetan	mix	NA	NA	1
+Dog	terrier, yorkshire	mix	NA	NA	28
+Dog	welsh corgi, cardigan	mix	NA	NA	1
