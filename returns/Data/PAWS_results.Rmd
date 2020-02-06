@@ -1,0 +1,40 @@
+---
+title: "PawsReturns"
+author: "JWD"
+date: "2/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(readr)
+library(stringr)
+library(knitr)
+# load file
+byAnimal <- read_csv("PetPoint_byAnimal.csv")
+```
+
+## R Markdown
+
+```{r animals}
+# creating a table with percentages of returned adoptions by staff
+# returned adoptions by Staff:
+byStaff <- byAnimal %>%
+        mutate(Returned.Intake = Intake.Subtype == "Returned Adoption") %>%
+        select(Returned.Intake, Released.By) %>%
+        group_by(Released.By) %>%
+        summarise(
+                  total_adoptions = n(),
+                  total_returned = sum (Returned.Intake == TRUE),
+                  freq_returned_adoptions = sum (Returned.Intake == TRUE) / n() 
+                  ) %>%
+        arrange(desc(total_adoptions) ,total_returned ,freq_returned_adoptions )
+kable(byStaff)
+
+```
+
+Conclusion:
+There are some staff, notably Griffin and Peterdi, who have a large number of adoptions but a low rate of returned adoptions. 
+
+
