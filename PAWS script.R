@@ -2,109 +2,108 @@ library(tidyverse)
 library(lubridate)
 library(rms)
 
-#load in Animal data and recode/rename as necessary
-Animal <- read_csv("PetPoint_byAnimal.csv") %>%
-  rename(Animal.ID = Animal..) %>%
-  mutate(
+# load in Animal data and recode/rename as necessary
+Animal <- read_csv("PetPoint_byAnimal.csv") 
+
+Agent_Tally <- Animal %>% group_by(Outcome.By) %>% summarise(n_agent=n())
+
+ Animal <- Animal %>% 
+   inner_join(Agent_Tally) %>% 
+   rename(Animal.ID = Animal..) %>%
+   mutate(
     Intake.Date = as.Date(parse_date_time(Intake.Date, "mdY HMS")),
     Outcome.Date = as.Date(parse_date_time(Outcome.Date, "mdY HMS")),
     Date.of.Birth = mdy(Date.of.Birth)
   ) %>%
+  mutate(Intake.Age=as.numeric(Intake.Date-Date.of.Birth)/30) %>%
+  mutate(Outcome.Age=as.numeric(Outcome.Date-Date.of.Birth)/30) %>%
   mutate(Returned.Intake = Intake.Subtype == "Returned Adoption") %>%
   mutate(Sick = str_detect(Intake.Condition, "Sick")) %>%
   mutate(Injured = str_detect(Intake.Condition, "Injured")) %>%
-  mutate("Young" = Intake.Condition == "Less Than 7 Weeks") %>%
-  mutate(Intake.Site2 = case_when(Intake.Site %in% c("Grant Avenue", "Grays Ferry Avenue", "PAWS Foster Program") ~ Intake.Site, TRUE ~ "PAWS Other")) %>%
+  mutate(Young = Intake.Condition == "Less Than 7 Weeks") %>%
+  mutate(Domestic = str_detect(Primary.Breed, "omestic")) %>%
+  mutate(Surrender = str_detect(Intake.Type, "urrender")) %>%
+mutate(Intake.Site2 = case_when(Intake.Site %in% c("Grant Avenue", "Grays Ferry Avenue", "PAWS Foster Program") ~ Intake.Site, TRUE ~ "PAWS Other")) %>%
   mutate(Female.a = Gender == "Female") %>%
   mutate(Month = month.abb[month(Outcome.Date)]) %>%
   group_by(Animal.ID) %>%
   arrange(Intake.Date) %>%
   mutate(Returned.From = case_when(lead(Returned.Intake) == TRUE ~ TRUE, TRUE ~ FALSE)) %>%
-  dplyr::select(Animal.ID, Species, Gender, Female.a, Altered, LOS, Intake.Date, Outcome.Date, Month, Intake.Type, Intake.Subtype, Intake.Site, Intake.Site2, Intake.Condition, LOS, Outcome.Age.in.Months, Returned.Intake, Returned.From, Sick, Injured, Young) %>%
+  dplyr::select(Animal.ID, Species, Gender, Female.a, Intake.Age,Outcome.Age,Altered, LOS, Intake.Date, Outcome.Date, Month, Intake.Type, Intake.Subtype, Intake.Site, Intake.Site2, Intake.Condition, LOS, Outcome.Age.in.Months, Returned.Intake, Returned.From, Sick, Injured, Young, Domestic, Surrender,n_agent) %>%
   filter(year(Intake.Date) >= 2017)
 
 describe(Animal)
 
 
+Mean_Zip <- read_csv("PAWS_modeling_MGM/PAWS_return_noshow/Mean_Zip.csv")
 
-#load in Person data and recode/rename as necessary
+# load in Person data and recode/rename as necessary
 Person <- read_csv("PetPoint_byPerson.csv") %>%
   mutate(
-    Outcome.Date = as.Date(parse_date_time(Operation.Date, "mdY HM"))
-  ) %>%
-  mutate(outside_philly = City != "Philadelphia") %>%
-  dplyr::select(Person.ID, Animal.ID, Gender, City, City.Alias, outside_philly, Postal.Code, Sex, Species, Spayed.Neutered, Age.As.Months, Outcome.Date, Outcome.Date)
+    Outcome.Date = as.Date(parse_date_time(Operation.Date, "mdY HM")),
+    Zip=as.numeric(Postal.Code),
+    outside_philly =City !="Philadelphia" ) %>%
+  left_join(Mean_Zip) %>%
+  dplyr::select(Person.ID, Animal.ID, Gender, outside_philly, Median, Sex, Species, Spayed.Neutered, Age.As.Months, Outcome.Date, Outcome.Date)
 
 describe(Person)
 
 
-#Link up
+# Link up
 join_tbl <- inner_join(Animal, Person, by = c("Animal.ID", "Outcome.Date"), suffix = c(".a", ".p")) %>%
   arrange(Animal.ID, Intake.Date, Outcome.Date) %>%
   distinct()
 
-#Set seed for reproducible results
+# Set seed for reproducible results
 set.seed(290120)
 
 
-#validate provides numerical checks for overfitting and allows assessment of whether parameters are kept.
-#calibrate allows for visual check on model performance
-
-frm_all <- Returned.From ~ (Species.a + Gender.p) * (Female.a + Sick + Injured + outside_philly + Month + Young) + Species.a * Gender.p + rcs(LOS) + rcs(Outcome.Age.in.Months) + Species.a %ia% rcs(LOS) + Species.a %ia% rcs(Outcome.Age.in.Months)
-lrm_all <- lrm(frm_all, join_tbl, x = TRUE, y = TRUE)
-val_all <- validate(lrm_all, bw = TRUE, B = 200)
-cal_all <- calibrate(lrm_all, B = 200)
-summary(attr(val_all, "kept"))
-
-frm_cut_interact <- Returned.From ~ Species.a + Gender.p + Female.a + Sick + Injured + outside_philly + Month + Young + rcs(LOS) + rcs(Outcome.Age.in.Months, 4) + Species.a %ia% rcs(LOS) + Species.a %ia% rcs(Outcome.Age.in.Months, 4)
-lrm_cut_interact <- lrm(frm_cut_interact, join_tbl, x = TRUE, y = TRUE)
-val_cut_interact <- validate(lrm_cut_interact, bw = TRUE, B = 200)
-cal_cut_interact <- calibrate(lrm_cut_interact, B = 200)
-summary(attr(val_cut_interact, "kept"))
-
-frm_limit_25 <- Returned.From ~ Species.a + Gender.p + Sick + outside_philly + Month + rcs(LOS) + rcs(Outcome.Age.in.Months, 4) + Species.a %ia% rcs(LOS) + Species.a %ia% rcs(Outcome.Age.in.Months, 4)
-lrm_limit_25 <- lrm(frm_limit_25, join_tbl, x = TRUE, y = TRUE)
-val_limit_25 <- validate(lrm_limit_25, bw = TRUE, B = 200)
-cal_limit_25 <- calibrate(lrm_limit_25, B = 200)
-summary(attr(val_limit_25, "kept"))
-
-anova(lrm_limit_25)
-
-frm_limit_NL <- Returned.From ~ Species.a + Gender.p + Sick + outside_philly + Month + rcs(LOS) + Outcome.Age.in.Months + Species.a %ia% rcs(LOS) + Species.a * Outcome.Age.in.Months
-lrm_limit_NL <- lrm(frm_limit_NL, join_tbl, x = TRUE, y = TRUE)
-val_limit_NL <- validate(lrm_limit_NL, bw = TRUE, B = 200)
-cal_limit_NL <- calibrate(lrm_limit_NL, B = 200)
-summary(attr(val_limit_NL, "kept"))
-
-frm_limit_final <- Returned.From ~ Species.a + Gender.p + Sick + LOS + Outcome.Age.in.Months + Species.a * Outcome.Age.in.Months
-lrm_limit_final <- lrm(frm_limit_final, join_tbl, x = TRUE, y = TRUE)
-val_limit_final <- validate(lrm_limit_final, bw = TRUE, B = 200)
-cal_limit_final <- calibrate(lrm_limit_final, B = 200)
-summary(attr(val_limit_final, "kept"))
-
-dd <- datadist(join_tbl)
-options(datadist = "dd")
-nomogram(lrm_limit_final, fun = plogis)
+# validate provides numerical checks for overfitting and allows assessment of whether parameters are kept.
+# calibrate allows for visual check on model performance
 
 
-ggplot(join_tbl, aes(x = Outcome.Age.in.Months, y = as.numeric(Returned.From), color = Species.a)) + geom_smooth(method = "glm", method.args = list(family = "binomial"))
-ggplot(join_tbl, aes(x = LOS, y = as.numeric(Returned.From), color = Species.a)) + geom_smooth(method = "glm", method.args = list(family = "binomial"))
-ggplot(join_tbl, aes(x = LOS, y = as.numeric(Returned.From))) + geom_smooth(method = "glm", method.args = list(family = "binomial"))
+frm_linear <- Returned.From ~ (Species.a + Gender.p + Intake.Site2)^2 +
+  (Species.a + Gender.p + Intake.Site2) * (Female.a + Sick + Injured + outside_philly + Month + Young +LOS  + Outcome.Age.in.Months + Domestic+Surrender +Median+ n_agent) - Species.a:Domestic - Intake.Site2:Domestic - Intake.Site2:Injured - Intake.Site2:Surrender - Intake.Site2:Young - Species.a:Young
+
+lrm_linear <- lrm(frm_linear,data=join_tbl, x = TRUE, y = TRUE) 
+anova(lrm_linear)
+val_linear <- validate(lrm_linear,B=200,bw=TRUE)
+kept_linear <-tibble(var=colnames(attr(val_linear,"kept")),kept=apply(attr(val_linear, "kept"),2,mean)) %>% arrange(desc(kept))
 
 
+frm_linear2 <- Returned.From ~  Intake.Site2+ (Species.a + Gender.p)   * (Female.a + Sick + Injured + outside_philly + Month + Young +LOS  + Outcome.Age.in.Months + Domestic+Surrender +Median+ n_agent) - Species.a:Domestic - Species.a:Young
+lrm_linear2 <- lrm(frm_linear2,data=join_tbl, x = TRUE, y = TRUE) 
+anova(lrm_linear2)
+val_linear2 <- validate(lrm_linear2,B=200,bw=TRUE)
+kept_linear2 <-tibble(var=colnames(attr(val_linear2,"kept")),kept=apply(attr(val_linear2, "kept"),2,mean)) %>% arrange(desc(kept))
+
+frm_linear3 <- Returned.From ~  Intake.Site2+ (Species.a + Gender.p)   * (Female.a + Sick + Injured + outside_philly + Young +LOS  + Outcome.Age.in.Months + Domestic+Surrender +Median+ n_agent) - Species.a:Domestic - Species.a:Young
+lrm_linear3 <- lrm(frm_linear3,data=join_tbl, x = TRUE, y = TRUE) 
+anova(lrm_linear3)
+val_linear3 <- validate(lrm_linear3,B=200,bw=TRUE)
+kept_linear3 <-tibble(var=colnames(attr(val_linear3,"kept")),kept=apply(attr(val_linear3, "kept"),2,mean)) %>% arrange(desc(kept))
+
+frm_linear4<- Returned.From ~  Gender.p*(LOS+Sick) + Species.a*(Injured+Outcome.Age.in.Months + Median)+Domestic+n_agent+Intake.Site2 +outside_philly
+lrm_linear4 <- lrm(frm_linear4,data=join_tbl, x = TRUE, y = TRUE) 
+
+pentrace(lrm_linear4,20:50) #turns out to be 37
+anova(update(lrm_linear4,penalty=37))
+
+lrm_final <- lrm(Returned.From~Gender.p+LOS+Sick+ Domestic + n_agent+ outside_philly+ Species.a*(Injured+Outcome.Age.in.Months+I(Median/1000.0)),data=join_tbl,penalty=37,x=TRUE,y=TRUE)
+val_final <-validate(lrm_final,B=200)
+cal_final <- calibrate(lrm_final,B=200)
+
+library(scales)
+
+ggplot(join_tbl,aes(x=Median,y=as.numeric(Returned.From),color=Species.a,fill=Species.a))+geom_smooth(method = glm, method.args = list(family = "binomial")) +scale_y_continuous(label=percent) +xlab("Median income for zip in $") +ylab ("Returned %")
+ggsave("Income + Species Return.jpg",dpi=600)
 
 
+ggplot(join_tbl,aes(x=Outcome.Age.in.Months,y=as.numeric(Returned.From),color=Species.a,fill=Species.a))+geom_smooth(method = glm, method.args = list(family = "binomial")) +scale_y_continuous(label=percent) +xlab("Outcome Age in Months") +ylab ("Returned %")
+ggsave("Age + Species Return.jpg",dpi=600)
 
-
-drop1(glm(frm, final_table, family = "binomial"))
-drop1(glm(frm2, final_table, family = "binomial"))
-drop1(glm(frm3, final_table, family = "binomial"))
-
-frm4 <- Returned.From ~ Species.a + rcs(Outcome.Age.in.Months) + Species.a %ia% rcs(Outcome.Age.in.Months) + Species.a * injured + female.a + Gender.p + rcs(LOS) + sick + injured + rcs(Outcome.Age.in.Months) + outside_philly + month
-frm5 <- Returned.From ~ Species.a + rcs(Outcome.Age.in.Months) + Species.a * injured + LOS + sick
-
-lrm5 <- lrm(frm5, final_table1, x = TRUE, y = TRUE)
-
-ggplot(join_tbl, aes(x = Outcome.Age.in.Months, y = as.numeric(Returned.From), color = Species.a)) + geom_smooth(method = "glm", method.args = list(family = "binomial"))
-
-ggplot(join_tbl, aes(x = LOS, y = as.numeric(Returned.From))) + geom_smooth(method = "glm", method.args = list(family = "binomial"))
+ggplot(join_tbl,aes(x=LOS,y=as.numeric(Returned.From)))+geom_smooth(method = glm, method.args = list(family = "binomial")) +scale_y_continuous(label=percent) +xlab("Length of Stay in Days") +ylab ("Returned %")
+ggsave("LOS Return.jpg",dpi=600)
+       
+ggplot(join_tbl,aes(x=n_agent,y=as.numeric(Returned.From)))+geom_smooth(method = glm, method.args = list(family = "binomial")) +scale_y_continuous(label=percent) +xlab("Volume per Agent") +ylab ("Returned %")
+ggsave("Agent volume Return.jpg",dpi=600)
