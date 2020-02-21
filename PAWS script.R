@@ -93,6 +93,23 @@ lrm_final <- lrm(Returned.From~Gender.p+LOS+Sick+ Domestic + n_agent+ outside_ph
 val_final <-validate(lrm_final,B=200)
 cal_final <- calibrate(lrm_final,B=200)
 
+join_tbl$n_agent0<-join_tbl$n_agent-mean(join_tbl$n_agent,na.rm=TRUE)
+join_tbl$Median0<-join_tbl$Median-mean(join_tbl$Median,na.rm=TRUE)
+join_tbl$Age0<-join_tbl$Outcome.Age.in.Months-mean(join_tbl$Outcome.Age.in.Months,na.rm=TRUE)
+join_tbl$LOS0<-join_tbl$LOS-mean(join_tbl$LOS,na.rm=TRUE)
+
+frm_interact_agent <- Returned.From ~  n_agent0*(Gender.p + LOS0 + Sick + Domestic + 
+  outside_philly + Species.a * (Injured + Age0 + 
+                                  I(Median0/1000)))
+
+lrm_intearct_agent <- lrm(frm_interact_agent,data=join_tbl,penalty=37,x=TRUE,y=TRUE)
+
+frm_interact_agent2 <- Returned.From ~ Gender.p + LOS + Sick + Domestic + n_agent + 
+  outside_philly + Species.a * (Injured + Outcome.Age.in.Months + 
+                                  I(Median/1000)) +  n_agent*Sick
+
+lrm_interact_agent2 <- lrm(frm_interact_agent2,data=join_tbl,penalty=37,x=TRUE,y=TRUE)
+
 library(scales)
 
 ggplot(join_tbl,aes(x=Median,y=as.numeric(Returned.From),color=Species.a,fill=Species.a))+geom_smooth(method = glm, method.args = list(family = "binomial")) +scale_y_continuous(label=percent) +xlab("Median income for zip in $") +ylab ("Returned %")
@@ -107,3 +124,7 @@ ggsave("LOS Return.jpg",dpi=600)
        
 ggplot(join_tbl,aes(x=n_agent,y=as.numeric(Returned.From)))+geom_smooth(method = glm, method.args = list(family = "binomial")) +scale_y_continuous(label=percent) +xlab("Volume per Agent") +ylab ("Returned %")
 ggsave("Agent volume Return.jpg",dpi=600)
+
+
+ggplot(join_tbl,aes(x=n_agent,y=as.numeric(Returned.From),color=Sick,fill=Sick))+geom_smooth(method = glm, method.args = list(family = "binomial")) +scale_y_continuous(label=percent) +xlab("Volume per Agent") +ylab ("Returned %")
+ggsave("Agent volume Return Sick.jpg",dpi=600)
