@@ -104,7 +104,7 @@ PetPoint_byPerson = PetPoint_byPerson %>%
 # fix variable type
 PetPoint_byPerson = PetPoint_byPerson %>%
         mutate_if(function(x){length(unique(x)) <=10}, as.factor) %>% 
-        mutate_at(vars(contains("Date")), function(x){parse_date_time(x, c("%m/%d/%Y %H:%M %p", "%m/%d/%Y %H:%M %p"))}) %>% 
+        mutate_at(vars(contains("Date")), function(x){parse_date_time(x, c("%m/%d/%Y %H:%M %p", "%m/%d/%Y %H:%M %p"), tz=Sys.timezone(location = TRUE))}) %>% 
         mutate(Date.Of.Birth=as.Date(Date.Of.Birth)) %>% 
         dplyr::rename(Date.of.Birth=Date.Of.Birth)
 PetPoint_byPerson = PetPoint_byPerson %>% 

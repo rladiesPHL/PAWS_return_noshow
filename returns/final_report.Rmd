@@ -1,0 +1,650 @@
+---
+title: "PWAS Animal Return Analytics"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Philadelphia Animal Welfare Society (PAWS) is a non-profit organization dedicated to saving Philadelphia’s homeless and at-risk animals. It is the city’s largest rescue partner and provider of low-cost, basic veterinary care for pet owners and rescue organizations that cannot otherwise access or afford it. Through its 3 no-kill shelters, foster care network, and special events, PAWS finds loving homes for thousands of animals each year. 
+
+However, PAWS has experienced a big number of returned animals after initial adoptions. Many factors, like the time of year, animal type, age, adopter life decision, etc, can contribute to the high return rate. R-Ladies Philly Community partner with PAWS and develop this analytic approach to better understand the reason behind high return rate and produce possible solutions to improve adoption process.
+
+## Contributors
+
+**Karla Fettich**
+
+**Mitch Maltenfort**
+
+**Julia Schuchard**
+
+**Chun Su** is a Bioinformatics Scientisit at Children's Hospital of Philadelphia (CHOP) and R-ladies Philly co-organizer. Her research focuses on the effect of 3-dimensional genome change on gene expression network regulation and its influence on the genetic susceptibility for childhood diseases.
+
+**Jesse Wind**
+
+## Datasets
+
+PetPoint records animal intake and outcome process from the perspectives of both animal and adopter.  *PetPoint_byAnimal.csv* record the animal information, including animal type, breed, health status, intake date, release date, etc. *PetPoint_byPerson.csv*  stored de-identified adopter data, including adopter gender, postal code, adoption location, etc.
+
+## Executive Summary
+This analysis investigated factors relating to an animal’s adoption process in the PAWS system using PetPoint data from 1/15/2018 to 1/15/2020. The group combined the byAnimal and byPerson dataset and traced each animal trajectory from intake to outcome. We formulated the data by adoption event per animal and define adoption outcome as "return" or "no return" and return time as days from adoption to return. Our primary factors of interest included return reasons, animal characteristics (age, size, breed, health), lenght of stay in shelter, adopter geographic patterns and agent experience.
+
+We found
+
+* Adoption return reasons are not largely dependent on animals. "Unrealistic expectation" and Adopter life-change (eg, "moving", "change in lifestyle" and "health of owner/family") are important reasons for animal returning.
+
+* Species has biggest effect on return chance. 
+
+* The effect of animal age is different from cats and dogs.  Older cats and younger dogs are more likely to be returned. 
+
+* Pit bulls, chihuahuas, and mixed breeds have higher return rates than other dogs.
+
+* Risk of adoption returns decreases with LOS.
+
+* adopters living outside Philly are less likely to return animals
+
+* Agent experience contribute to the successful adoption of an animal. However, when animal was sick at 
+
+
+## Results
+
+### Overall Animal Return Outcomes
+
+There are 6687 in-and-out records of PAWS from 1/15/2018-1/15/2020. It involved 6330 animals, including 5599 cats and 731 dogs. Out of 6330 animals, 6329 animals that were adopted from last two years. 6.7% (378) cats and 10.8% (79) dogs have experienced return to PAWS after adoption. 39 animals have been returned more than once. 
+
+```{r echo=F, message=F, warning=F}
+library(tidyverse)
+load("Data/PetPoint_data.Rdata")
+df = left_join(
+        PetPoint %>% 
+                select(Animal.ID, Species) %>% 
+                distinct(),
+        PetPoint %>% filter(Intake.Type=="Return") %>% 
+                select(Animal.ID, Species, Return.Date=Intake.Date, Outcome.Date) %>% 
+        group_by(Animal.ID, Species) %>% 
+        summarise(record_n=n_distinct(row_number())) %>% 
+        ungroup()
+) %>% mutate(record_n=ifelse(is.na(record_n),0, record_n))
+df = df %>% group_by(Species, record_n) %>% 
+        summarise(animal_n = n_distinct(Animal.ID))
+df = df %>% ungroup() %>% 
+        mutate(record_n=gsub("^","num_", record_n)) %>% 
+        spread(key=record_n, value=animal_n) %>% 
+        mutate_if(function(x){any(is.na(x))}, function(x){ifelse(is.na(x),0,x)}) %>% 
+        gather(key="record_n", value=animal_n, contains("num")) %>% 
+        mutate(record_n=as.integer(gsub("num_","",record_n)))
+ggplot(df, aes(x=factor(record_n),y=animal_n, fill=Species)) +
+        geom_bar(stat="identity", position="dodge") +
+        geom_text(aes(label=animal_n), vjust=-0.5, position=position_dodge(0.75)) +
+        xlab("times of returned") +
+        ylab("number of animal")
+```
+
+There are 347 return events of which the corresponding adoption date can be traced over the 2-year recording range. They involve 289 animals (232 cats and 57 dogs). Out of 347 return events, we noticed 17 unrealistic return events which happpen within 1 hour, with 12 events happening within 5 mins. It may result from data entery error. After removing the returns within 1 hour, 70% (231) returns happened within 90 days. The return time peaked differently between species, with 8 days for dog, while 14 days for cat.
+
+```{r, echo=F, message=F, warning=F}
+return_events = PetPoint_byAnimal %>% 
+        filter(Intake.Type=="Return") %>% 
+        select(Animal.ID, Species, Return.Date = Intake.Date)
+
+return_events = left_join(
+        PetPoint_byAnimal %>% 
+                select(Animal.ID, Species, Outcome.Date),
+        return_events
+) %>% filter(!is.na(Return.Date)) %>% 
+        mutate(out_shelter_min = difftime(Return.Date,Outcome.Date)) %>% 
+        filter(out_shelter_min > 0)
+
+df = return_events %>% 
+        mutate(days_out_shelter=as.numeric(out_shelter_min)) %>% 
+        mutate(days_out_shelter=days_out_shelter/(60*24))
+
+# ggplot(df, aes(out_shelter_length)) +
+#         geom_histogram(binwidth=1) +
+#         geom_density() +
+#         xlab("days from adoption to return") +
+#         ylab("return event frequency")
+
+knitr::kable(
+        df %>% filter(days_out_shelter > 1/24) %>% 
+mutate(days_from_adopt_to_return = cut(days_out_shelter,c(0,1,7,14,30,90,180,365,Inf))) %>% 
+group_by(days_from_adopt_to_return) %>% 
+summarise(return_event_number = n_distinct(row_number())) %>% 
+        mutate(cumsum_return_event_number = cumsum(return_event_number)),
+        caption = "Days from adoption to return"
+)
+
+# plot return dates
+# df2 = df %>% filter(days_out_shelter > 1/24) %>% 
+#         mutate(days_out_shelter=ceiling(days_out_shelter)) %>% 
+#         group_by(days_out_shelter,Species) %>% 
+#         count() %>% 
+#         ungroup()
+# p = ggplot(df2,aes(x=days_out_shelter, y=n)) +
+#         facet_wrap(~Species) +
+#         geom_point()
+# p + geom_smooth(method = "lm", formula = y ~ poly(x, 3), se = FALSE) +
+#         geom_vline(xintercept = 7, color="red", linetype=3)
+
+
+density_dog=density(df %>% filter(days_out_shelter > 1/24) %>% filter(Species=="Dog") %>% pull(days_out_shelter))
+peak_dog = density_dog$x[which.max(density_dog$y)]
+density_cat=density(df %>% filter(days_out_shelter > 1/24) %>% filter(Species=="Cat") %>% pull(days_out_shelter))
+peak_cat = density_cat$x[which.max(density_cat$y)]
+
+ggplot(df %>% filter(days_out_shelter > 1/24),aes(x=days_out_shelter)) +
+        geom_density(aes(fill=Species, color=Species), alpha=0.5) +
+        geom_vline(data=tibble(xintercept=c(peak_dog,peak_cat), Species=c("Dog","Cat")), aes(xintercept=xintercept, color=Species)) +
+        xlab("days from adoption to return") +
+        ylab("frequency of returns")
+```
+
+### Return Reasons
+
+To explore the 34 recorded reasons that an animal got returned back to PAWS, "moving" is the top reason contributing to cat return while "Behavior Issues" for dog return. We further carefully classified those reasons to mainly from "adopter-side" and from "animal-side". eg. we would consider "moving", "too many aniamls" and "Divorce / Separation" as "owner-side" reason, while "aggression to animal", "too active" and "behavior issue" as "animal-side" reason. Based on 34 recorded reasons, we found 16 can be devoted as "animal-side" reasons while 18 as "owner-side" reasons.
+
+Among the top 10 return reasons for both cat and dog, more than half of cases are from adopter side, like "moving", "unreleasitic expectation", " allergic to animal" and "health of owner or family", "landload issue" and "change of lifestyle". Vagues term "unreleasitic expectation" are equally important reasons for both cat and dog.
+
+```{r, echo=F, warning=F, message=F, fig.width = 10}
+# inspect return reasons for animal return and classify it to owner-side or animal-side
+Return.Reason =  PetPoint %>% filter(Intake.Type=="Return") %>% 
+        distinct(Intake.Reason) %>% 
+        mutate(Return.Reason.Group=c("owner-side","owner-side","owner-side","owner-side","animal-side","owner-side","owner-side","animal-side","animal-side","owner-side","animal-side","owner-side","animal-side","animal-side","animal-side","animal-side","owner-side","owner-side","owner-side","animal-side","owner-side","owner-side","owner-side","animal-side","owner-side","animal-side","animal-side","animal-side","owner-side","animal-side","owner-side","owner-side","animal-side","animal-side"))
+
+# Return.Reason %>% as.data.frame()
+
+# top 10 reason sorted by returned animal number per species
+df = PetPoint %>% filter(Intake.Type=="Return") %>% 
+        select(Animal.ID, Species, Intake.Reason) %>% 
+        distinct() %>% 
+        group_by(Species, Intake.Reason) %>% 
+        summarise(animal_n=n_distinct(Animal.ID)) %>% 
+        top_n(n = 10, wt = animal_n) %>% 
+        ungroup() %>% 
+        arrange(Species, animal_n) %>%
+        mutate(order=row_number())
+# calculate the animal percentage for each reason
+df = left_join(
+        df, 
+        PetPoint %>% filter(Intake.Type=="Return") %>% 
+                group_by(Species) %>% 
+                summarise(total=n_distinct(Animal.ID))
+) %>% mutate(animal_perc=animal_n/total*100)
+
+# add reason group
+df = left_join(df, Return.Reason)
+ggplot(df %>% filter(), aes(x=order, y=animal_perc, fill=Return.Reason.Group)) +
+        facet_wrap(~Species, scales = "free") +
+        geom_col()+
+        coord_flip() +
+        scale_x_continuous(
+                breaks = df$order,
+                labels = df$Intake.Reason,
+                expand = c(0,0)
+        ) +
+        ylab("Percentage of total returned animal within species (%)")+
+        xlab("Return.Reason") +
+        theme(legend.position = "bottom")
+```
+
+Focusing on the animal returned to PAWS multiple times, we are wondering whether those animal were always returned with animal-side reasons. Out of 39 multiple-times-returned animals, only 3 (cat A15451188, A38026544 and A42298667) were returned with always animal-side reasons. Only cat A38026544 were returned for the exactly same reason (Not Housebroken / Housesoiling). 
+
+All together, it suggests that reason for returning animals are not largely dependent on animals. "Unrealistic expectation" and Adopter life-change (eg, "moving", "change in lifestyle" and "health of owner/family") are important reasons for animal returning from owner-side.
+
+### Animal characteristics
+
+#### Species and Age
+
+From the previous "Overall Animal Return Outcomes", we observed significantly difference between cats and dogs in terms of return ratio. Generally, dogs experience higher return ratio compared to cats (10.8% vs. 6.7%).
+
+When combining with animal age to build logistic regression model, we observed significant interaction between animal age and species (p-value =0.0016). The effect of animal age is different from cats and dogs.  Older cats and younger dogs are more likely to be returned. 
+
+```{r, echo=F, message=F, warning=F}
+library(lubridate)
+library(rms)
+
+Animal <- read_csv("Data/PetPoint_byAnimal.csv") %>%
+  rename(Animal.ID = Animal..) %>%
+  mutate(
+    Intake.Date = as.Date(parse_date_time(Intake.Date, "mdY HMS")),
+    Outcome.Date = as.Date(parse_date_time(Outcome.Date, "mdY HMS")),
+    Date.of.Birth = mdy(Date.of.Birth)
+  ) %>%
+  mutate(Returned.Intake = Intake.Subtype == "Returned Adoption") %>%
+  mutate(Sick = str_detect(Intake.Condition, "Sick")) %>%
+  mutate(Injured = str_detect(Intake.Condition, "Injured")) %>%
+  mutate("Young"=Intake.Condition== "Less Than 7 Weeks") %>%
+  mutate(Intake.Site2=case_when(Intake.Site %in% c("Grant Avenue","Grays Ferry Avenue","PAWS Foster Program")~Intake.Site,TRUE~"PAWS Other")) %>%
+  mutate(Female.a = Gender == "Female") %>%
+  mutate(Month=month.abb[month(Outcome.Date)]) %>% 
+  group_by(Animal.ID) %>%
+  arrange(Intake.Date) %>% 
+  mutate(Returned.From = case_when(lead(Returned.Intake) == TRUE ~ TRUE, TRUE ~ FALSE)) %>%
+  dplyr::select(Animal.ID, Species, Gender, Female.a, Altered, LOS, Intake.Date, Outcome.Date, Month, Intake.Type, Intake.Subtype, Intake.Site, Intake.Site2, Intake.Condition, LOS, Outcome.Age.in.Months, Returned.Intake, Returned.From, Sick,Injured,Young) %>%
+  filter(year(Intake.Date) >= 2017)
+
+Person <- read_csv("Data/PetPoint_byPerson.csv") %>%
+  mutate(
+    Outcome.Date = as.Date(parse_date_time(Operation.Date, "mdY HM"))
+  ) %>%
+  mutate(outside_philly = City != "Philadelphia") %>%
+  dplyr::select(Person.ID, Animal.ID, Gender, City, City.Alias, outside_philly, Postal.Code, Sex, Species, Spayed.Neutered, Age.As.Months, Outcome.Date, Outcome.Date) 
+
+join_tbl <- inner_join(Animal, Person, by = c("Animal.ID", "Outcome.Date"), suffix = c(".a", ".p")) %>%
+  arrange(Animal.ID, Intake.Date, Outcome.Date) %>%
+  distinct()
+
+set.seed(290120)
+
+frm_limit_final  <-  Returned.From ~ Species.a + Gender.p + Sick + LOS + Outcome.Age.in.Months +  Species.a * Outcome.Age.in.Months
+lrm_limit_final <- lrm(frm_limit_final, join_tbl,x=TRUE,y=TRUE)
+# lrm_limit_final
+# val_limit_final <- validate(lrm_limit_final,bw=TRUE,B=200)
+# cal_limit_final <- calibrate(lrm_limit_final,B=200)
+# summary(attr(val_limit_final,"kept"))
+# 
+# dd<-datadist(join_tbl)
+# options(datadist='dd')
+# nomogram(lrm_limit_final, fun=plogis)
+```
+
+```{r, echo=F, message=F, warning=F, fig.width=10}
+library(gridExtra)
+p1 = ggplot(join_tbl,aes(x=Species.a,y=Outcome.Age.in.Months,color=Returned.From)) + geom_boxplot(fill="white") +
+        xlab("Species") +
+        guides(color=guide_legend(title="Returned")) +
+        scale_color_manual(values=c("#00BFC4","#F8766D"))
+
+p2 = ggplot(join_tbl,aes(x=Outcome.Age.in.Months,y=as.numeric(Returned.From),color=Species.a))+
+        geom_smooth(method="glm",method.args=list(family="binomial")) +
+        ylab("Return.Probability")
+grid.arrange(p1,p2,nrow=1)
+
+```
+
+#### Length of Stay (LOS)
+
+On average, animal stays at PAWS for 70 days before getting adopted. Dogs stay about half of time than cats (Dog: 38.8 days, Cat: 74.2 days). In both species, we observed decreased length of stay among the returned animals. Logistic regression reveals that significant negative correltion between LOS and return probability (P-value < 0.0001)
+
+```{r, echo=F, message=F, warning=F, fig.width=10}
+tmp = join_tbl %>% 
+        ungroup() %>% 
+        select(Animal.ID, Species.a, LOS, Returned.From )
+
+p1 = ggplot(tmp, aes(x=Species.a, y=LOS, color=Returned.From)) +
+        geom_boxplot(fill="white", outlier.shape=NA) +
+        xlab("Species") +
+        ylim(c(0,250)) +
+        guides(color=guide_legend(title="Returned")) +
+        scale_color_manual(values=c("#00BFC4","#F8766D"))
+p2 = ggplot(join_tbl,aes(x=LOS,y=as.numeric(Returned.From),color=Species.a))+
+        geom_smooth(method="glm",method.args=list(family="binomial"), se=F) +
+        xlab("Length of Stay (days)") +
+        ylab("Return Probability") +
+        guides(color=guide_legend(title="Species"))
+grid.arrange(p1,p2,nrow=1)
+```
+
+#### Sickness
+
+Animal sickeness was measured when animal was taken in. Usually sick animals are treated before being placed in the adoption system. By default, we were expecting that orignal sick animal will have same outcome as healthy animal in terms of return possibility. However, we observed statistically elevated return odds for the aniamls that were diagnosis as "sick" than healthy animal (P-value=1.4, Odd ratio = 1.41).
+
+```{r, echo=F, warning=F, message=F}
+tmp = join_tbl %>% 
+        ungroup() %>% 
+        select(Animal.ID, Species.a, Sick, Returned.From ) %>% 
+        group_by(Species.a, Sick, Returned.From) %>% 
+        count() %>% 
+        ungroup()
+
+tmp = left_join(
+        tmp,
+        tmp %>% 
+        group_by(Species.a, Sick) %>% 
+        summarise(total=sum(n)) %>% 
+                ungroup()
+) %>% mutate(return.ratio=n/total)
+
+ggplot(tmp) +
+        facet_wrap(~Species.a) +
+        geom_col(aes(x=Sick, y=return.ratio, fill=Returned.From)) +
+        guides(color=guide_legend(title="Returned")) +
+        scale_fill_manual(values=c("#00BFC4","#F8766D"))
+
+```
+
+#### breed and hair length
+
+The PetPoint breed column contains heterogenous information for cat and dog. It mainly records hair length of cat but breed of dog. Among 731 dogs, 143 are pitbull and 108 are chihuahua. We observed elevated return ratio in chihuahua and pitbull, but neither comparison is statistically significant.
+
+```{r, echo=F, warning=F, message=F}
+PetPoint_byAnimal_withTarget = left_join(
+        PetPoint_byAnimal,
+        return_events %>% select(-Return.Date) %>% 
+                mutate(return="YES")
+        ) %>% 
+        mutate(return=ifelse(is.na(return),"NO",return))
+
+PetPoint_byAnimal_withTarget = PetPoint_byAnimal_withTarget %>% 
+        mutate(Primary.Breed=tolower(Primary.Breed))
+
+breeds = PetPoint_byAnimal_withTarget %>% 
+        distinct(Species, Primary.Breed, Animal.ID) %>% 
+        mutate(
+                hair_length=case_when(
+                        Species=="Cat" & grepl("short",Primary.Breed) ~ "short",
+                        Species=="Cat" & grepl("medium",Primary.Breed) ~ "medium",
+                        Species=="Cat" & grepl("long",Primary.Breed) ~ "long"
+                )
+        ) %>% 
+        mutate(
+                pitbull=ifelse(Species=="Dog" & grepl("pit bull",Primary.Breed), "pitbull", NA)
+        ) %>% 
+        mutate(
+                chihuahua=ifelse(Species=="Dog" & grepl("chihuahua",Primary.Breed), "chihuahua", NA)
+        )
+
+
+### cat hair
+tmp0 = left_join(
+        PetPoint_byAnimal_withTarget,
+        breeds
+) %>%  filter(Species=="Cat") %>% 
+        select(Animal.ID, Outcome.Date, hair_length, return) %>% 
+        mutate(hair_length=factor(hair_length, levels=c("short","medium","long")))
+
+
+# tmp0 %>% group_by(hair_length) %>% 
+#         summarise(animal_n=n_distinct(Animal.ID))
+
+tmp0_sum = left_join(
+        tmp0 %>% distinct(Animal.ID,hair_length,return) %>% 
+        group_by(hair_length,return) %>% 
+        count() %>% ungroup(),
+        tmp0 %>% distinct(Animal.ID,hair_length,return) %>% 
+        group_by(hair_length,return) %>% 
+        count() %>% ungroup() %>% 
+                group_by(hair_length) %>% 
+                summarise(total=sum(n)) %>% 
+                ungroup()
+) %>% mutate(return.ratio=n/total) %>%
+filter(!is.na(hair_length))
+ggplot(tmp0_sum, aes(x=hair_length,y=return.ratio, fill=return)) +
+        geom_col() +
+        scale_fill_manual(values=c("#00BFC4","#F8766D"))
+
+hair_lrm_fmt  <-  return ~ hair_length
+hair_lrm_fmt <- lrm(hair_lrm_fmt, tmp0,x=TRUE,y=TRUE)
+# hair_lrm_fmt
+
+### dog breed -- pitbull
+tmp = left_join(
+        PetPoint_byAnimal_withTarget,
+        breeds
+) %>%  filter(Species=="Dog") %>% 
+        select(Animal.ID, Outcome.Date, pitbull, return) %>% 
+        mutate(pitbull=ifelse(is.na(pitbull),"non-pitbull",pitbull)) %>% 
+        mutate(pitbull=factor(pitbull, levels = c("non-pitbull","pitbull")))
+# tmp %>% distinct(Animal.ID,pitbull) %>% 
+#         group_by(pitbull) %>% 
+#         count() %>% ungroup()
+
+tmp_sum = left_join(
+        tmp %>% distinct(Animal.ID,pitbull,return) %>% 
+        group_by(pitbull,return) %>% 
+        count() %>% ungroup(),
+        tmp %>% distinct(Animal.ID,pitbull,return) %>% 
+        group_by(pitbull,return) %>% 
+        count() %>% ungroup() %>% 
+                group_by(pitbull) %>% 
+                summarise(total=sum(n)) %>% 
+                ungroup()
+) %>% mutate(return.ratio=n/total)
+p1 = ggplot(tmp_sum, aes(x=pitbull,y=return.ratio, fill=return)) +
+        geom_col() +
+        scale_fill_manual(values=c("#00BFC4","#F8766D")) +
+        xlab("") +
+        scale_x_discrete(labels=c("non_pitbull" = "non-pitbull", "pitbull"="pitbull")) +
+        coord_flip()
+
+
+
+pitbull_lrm_fmt  <-  return ~ pitbull
+pitbull_lrm_fmt <- lrm(pitbull_lrm_fmt, tmp,x=TRUE,y=TRUE)
+# pitbull_lrm_fmt
+
+
+### dog breed -- chihuahua
+tmp2 = left_join(
+        PetPoint_byAnimal_withTarget,
+        breeds
+) %>%  filter(Species=="Dog") %>% 
+        select(Animal.ID, Outcome.Date, chihuahua, return) %>% 
+        mutate(chihuahua=ifelse(is.na(chihuahua),"non-chihuahua",chihuahua)) %>% 
+        mutate(chihuahua=factor(chihuahua, levels = c("non-chihuahua","chihuahua")))
+# tmp2 %>% distinct(Animal.ID,chihuahua) %>% 
+#         group_by(chihuahua) %>% 
+#         count() %>% ungroup()
+chihuahua_lrm_fmt  <-  return ~ chihuahua
+chihuahua_lrm_fmt <- lrm(chihuahua_lrm_fmt, tmp2,x=TRUE,y=TRUE)
+# chihuahua_lrm_fmt
+
+tmp2_sum = left_join(
+        tmp2 %>% distinct(Animal.ID,chihuahua,return) %>% 
+        group_by(chihuahua,return) %>% 
+        count() %>% ungroup(),
+        tmp2 %>% distinct(Animal.ID,chihuahua,return) %>% 
+        group_by(chihuahua,return) %>% 
+        count() %>% ungroup() %>% 
+                group_by(chihuahua) %>% 
+                summarise(total=sum(n)) %>% 
+                ungroup()
+) %>% mutate(return.ratio=n/total)
+p2 = ggplot(tmp2_sum, aes(x=chihuahua,y=return.ratio, fill=return)) +
+        geom_col() +
+        scale_fill_manual(values=c("#00BFC4","#F8766D")) +
+        xlab("") +
+        scale_x_discrete(labels=c("non_chihuahua" = "non-chihuahua", "chihuahua"="chihuahua")) +
+        coord_flip()
+
+### dog breed -- either chihuahua or pitbull
+tmp3 = left_join(
+        tmp,
+        tmp2
+) %>% mutate(hard_breed=case_when(
+        pitbull=="pitbull" ~ "hard_breed",
+        chihuahua=="chihuahua" ~ "hard_breed",
+        TRUE ~ "non_hard_breed"
+)) %>% 
+        mutate(hard_breed=factor(hard_breed, levels=c("non_hard_breed","hard_breed")))
+
+# tmp3 %>% distinct(Animal.ID,hard_breed) %>% 
+#         group_by(hard_breed) %>% 
+#         count() %>% ungroup()
+hard_breed_lrm_fmt  <-  return ~ hard_breed
+hard_breed_lrm_fmt <- lrm(hard_breed_lrm_fmt, tmp3,x=TRUE,y=TRUE)
+# hard_breed_lrm_fmt
+
+tmp3_sum = left_join(
+        tmp3 %>% distinct(Animal.ID,hard_breed,return) %>% 
+        group_by(hard_breed,return) %>% 
+        count() %>% ungroup(),
+        tmp3 %>% distinct(Animal.ID,hard_breed,return) %>% 
+        group_by(hard_breed,return) %>% 
+        count() %>% ungroup() %>% 
+                group_by(hard_breed) %>% 
+                summarise(total=sum(n)) %>% 
+                ungroup()
+) %>% mutate(return.ratio=n/total)
+p3 = ggplot(tmp3_sum, aes(x=hard_breed,y=return.ratio, fill=return)) +
+        geom_col() +
+        scale_fill_manual(values=c("#00BFC4","#F8766D")) +
+        xlab("") +
+        scale_x_discrete(labels=c("non_hard_breed" = "neither chihuahua nor pitbull", "hard_breed"="chihuahua or pitbull")) +
+        coord_flip()
+
+grid.arrange(p1,p2,p3,nrow=3)
+
+```
+
+### Adopter characteristics
+
+
+```{r, echo=F, message=F, warning=F}
+Animal <- read_csv("Data/PetPoint_byAnimal.csv") 
+
+Agent_Tally <- Animal %>% group_by(Outcome.By) %>% summarise(n_agent=n())
+
+ Animal <- Animal %>% 
+   inner_join(Agent_Tally) %>% 
+   rename(Animal.ID = Animal..) %>%
+   mutate(
+    Intake.Date = as.Date(parse_date_time(Intake.Date, "mdY HMS")),
+    Outcome.Date = as.Date(parse_date_time(Outcome.Date, "mdY HMS")),
+    Date.of.Birth = mdy(Date.of.Birth)
+  ) %>%
+  mutate(Intake.Age=as.numeric(Intake.Date-Date.of.Birth)/30) %>%
+  mutate(Outcome.Age=as.numeric(Outcome.Date-Date.of.Birth)/30) %>%
+  mutate(Returned.Intake = Intake.Subtype == "Returned Adoption") %>%
+  mutate(Sick = str_detect(Intake.Condition, "Sick")) %>%
+  mutate(Injured = str_detect(Intake.Condition, "Injured")) %>%
+  mutate(Young = Intake.Condition == "Less Than 7 Weeks") %>%
+  mutate(Domestic = str_detect(Primary.Breed, "omestic")) %>%
+  mutate(Surrender = str_detect(Intake.Type, "urrender")) %>%
+mutate(Intake.Site2 = case_when(Intake.Site %in% c("Grant Avenue", "Grays Ferry Avenue", "PAWS Foster Program") ~ Intake.Site, TRUE ~ "PAWS Other")) %>%
+  mutate(Female.a = Gender == "Female") %>%
+  mutate(Month = month.abb[month(Outcome.Date)]) %>%
+  group_by(Animal.ID) %>%
+  arrange(Intake.Date) %>%
+  mutate(Returned.From = case_when(lead(Returned.Intake) == TRUE ~ TRUE, TRUE ~ FALSE)) %>%
+  dplyr::select(Animal.ID, Species, Gender, Female.a, Intake.Age,Outcome.Age,Altered, LOS, Intake.Date, Outcome.Date, Month, Intake.Type, Intake.Subtype, Intake.Site, Intake.Site2, Intake.Condition, LOS, Outcome.Age.in.Months, Returned.Intake, Returned.From, Sick, Injured, Young, Domestic, Surrender,n_agent) %>%
+  filter(year(Intake.Date) >= 2017)
+
+ Mean_Zip <- read_csv("Data/Mean_Zip.csv")
+
+# load in Person data and recode/rename as necessary
+Person <- read_csv("Data/PetPoint_byPerson.csv") %>%
+  mutate(
+    Outcome.Date = as.Date(parse_date_time(Operation.Date, "mdY HM")),
+    Zip=as.numeric(Postal.Code),
+    outside_philly =City !="Philadelphia" ) %>%
+  left_join(Mean_Zip) %>%
+  dplyr::select(Person.ID, Animal.ID, Gender, outside_philly, Median, Sex, Species, Spayed.Neutered, Age.As.Months, Outcome.Date, Outcome.Date)
+
+# link up
+join_tbl <- inner_join(Animal, Person, by = c("Animal.ID", "Outcome.Date"), suffix = c(".a", ".p")) %>%
+  arrange(Animal.ID, Intake.Date, Outcome.Date) %>%
+  distinct()
+
+set.seed(290120)
+
+join_tbl$n_agent0<-join_tbl$n_agent-mean(join_tbl$n_agent,na.rm=TRUE)
+join_tbl$Median0<-join_tbl$Median-mean(join_tbl$Median,na.rm=TRUE)
+join_tbl$Age0<-join_tbl$Outcome.Age.in.Months-mean(join_tbl$Outcome.Age.in.Months,na.rm=TRUE)
+join_tbl$LOS0<-join_tbl$LOS-mean(join_tbl$LOS,na.rm=TRUE)
+
+join_tbl = join_tbl %>% ungroup()
+
+lrm_final <- lrm(Returned.From~Gender.p+LOS+Sick+ Domestic + n_agent+ outside_philly+ Species.a*(Injured+Outcome.Age.in.Months+I(Median/1000.0)),data=join_tbl,penalty=37,x=TRUE,y=TRUE)
+val_final <-validate(lrm_final,B=200)
+cal_final <- calibrate(lrm_final,B=200)
+```
+
+#### Adopter geographic impact
+19.5% adopters living outside Philadelphia. By comparing people living within and outside Philadelphia, we observed people living outside of Philly are less likely to return animals, particularly cats (p-value = 0.04, odds ratio = 0.7003325). Conversely, people living within Philly are less likely to return dogs.
+
+```{r, echo=F, message=F, warning=F}
+df = join_tbl %>% select(Animal.ID, Species.a, outside_philly, Returned.From) %>% 
+        filter(!is.na(outside_philly))
+
+# adoptor_loc_frm <- Returned.From ~ outside_philly*Species.a
+# lrm(adoptor_loc_frm,data=df,penalty=37,x=TRUE,y=TRUE)
+
+tmp =df %>% 
+        group_by(Species.a, outside_philly, Returned.From) %>% 
+        count() %>% ungroup()
+
+tmp = left_join(
+        tmp,
+        tmp %>% group_by(Species.a, outside_philly) %>% 
+                summarise(total=sum(n)) %>% 
+                ungroup()
+) %>% mutate(return.ratio=n/total)
+
+ggplot(tmp, aes(x=outside_philly, y=return.ratio, fill=Returned.From)) +
+        facet_wrap(~Species.a) +
+        geom_col() +
+        scale_fill_manual(values=c("#00BFC4","#F8766D")) +
+        xlab("Adopter living outside Philly")
+```
+
+
+#### Adopter income impact
+One of important geographic impact (neighbourhood difference) is income. We incoperated median income based on postal zipcode to our byPerson dataset. Like neighbourhood difference (within-philly vs outside-philly), we found opposite return probability association between dog and cat. Higher income results in lower return for cats but higher return for dogs.
+
+```{r, echo=F, message=F, warning=F}
+library(scales)
+ggplot(join_tbl,aes(x=Median,y=as.numeric(Returned.From),color=Species.a,fill=Species.a))+
+        geom_smooth(method = glm, method.args = list(family = "binomial")) +
+        scale_y_continuous(label=percent) +
+        xlab("Median income for zip in $") +
+        ylab ("Returned %")
+```
+
+### Agents
+Agent experience contributes greatly to the outcome of adoptions. We created a variable "Volumn by Agent" which meausre the case number Agent has handled by adoption time. We noticed a significantly negative association between Volumn by Agent and return probability. More experienced agents have a better adoption outcome in terms of animal returns. 
+
+```{r, echo=F, message=F, warning=F}
+ggplot(join_tbl,aes(x=n_agent,y=as.numeric(Returned.From),color=Species.a,fill=Species.a))+
+        geom_smooth(method = glm, method.args = list(family = "binomial")) +
+        scale_y_continuous(label=percent) +xlab("Median income for zip in $") +
+        ylab ("Returned %")+
+        scale_y_continuous(label=percent) +xlab("Volume per Agent")
+
+```
+
+
+However, this association does not hold when it comes to animals that were sick at take-in time. If animal was sick, the experience of agent does not add up more successful adoptions.
+
+```{r, echo=F, message=F, warning=F}
+ggplot(join_tbl,aes(x=n_agent,y=as.numeric(Returned.From),color=Sick,fill=Sick))+
+        geom_smooth(method = glm, method.args = list(family = "binomial")) +
+        scale_y_continuous(label=percent) +
+        xlab("Volume per Agent") +
+        ylab ("Returned %")
+```
+
+### Factor importance
+
+In the above analysis, we found that factors "Species", "LOS", "animal age", "Sickness", "adopter neighbourhood", "adopter median income" and "agent experience" contribute to the animal return chance. To understand which factor plays most important role in animal returns, we performed logistic regression model on above seven factors and rank the contribution of each factor. "Lenght of stay" is the most important contributor to return chance, followed by "Species" and "animal age".
+
+```{r, echo=F, message=F, warning=F}
+df = join_tbl %>% select(Species.a, Age.As.Months, LOS, Sick, outside_philly, Median, n_agent, Returned.From) %>% 
+        mutate(Sick=as.factor(ifelse(Sick,"Sick","noSick"))) %>% 
+        mutate(outside_philly=as.factor(ifelse(outside_philly,"outside","within"))) %>% 
+        mutate(Returned.From=as.factor(ifelse(Returned.From,"return","noreturn"))) %>% 
+        na.omit()
+
+glm_model1 = glm(Returned.From ~., family = "binomial", data=df)
+
+dapres<-dominanceanalysis::dominanceAnalysis(glm_model1)
+
+importance = dominanceanalysis::averageContribution(dapres,fit.functions = "r2.m")
+
+importance = tibble(
+        variables=names(unlist(importance)),
+        importance=unlist(importance)
+) %>% 
+        mutate(variables=gsub("r2\\.m\\.","",variables)) %>% 
+        arrange(importance)
+
+ggplot(importance, aes(x=reorder(variables,importance),y=importance)) +
+        geom_col(fill="white", color="blue") +
+        coord_flip() +
+        xlab("variables") +
+        scale_x_discrete(labels=c("LOS"="Length of stay (days)", "Species.a" = "Species", "Age.As.Months" = "Animal age (months)", "Sick" = "Animal in-take health status", "n_agent"="Volumn by Agent", "outside_philly"="Adopter Neighbourhood", "Median"="Adopter median income"))
+
+
+```
+

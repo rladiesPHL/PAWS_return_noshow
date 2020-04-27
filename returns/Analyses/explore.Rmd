@@ -152,6 +152,7 @@ save(PetPoint, PetPoint_byAnimal, PetPoint_byPerson, file="../Data/PetPoint_data
 We start exploratory data analysis (EDA) by examining all variables
 
 ```{r global-animal, message=FALSE}
+# load("Data/PetPoint_data.Rdata")
 # quick global view
 df_status(PetPoint)
 
@@ -236,7 +237,6 @@ ggplot(df %>% filter(), aes(x=order, y=animal_perc, fill=Return.Reason.Group)) +
         ylab("Percentage of total returned animal within species (%)")+
         xlab("Return.Reason") +
         theme(legend.position = "bottom")
-        
 ```
 To explore the 34 recorded reasons that an animal got returned back to PAWS, "moving" is the top reason contributing to cat return while "Behavior Issues" for dog return. We further carefully classified those reasons to mainly from "owner-side" and from "animal-side". eg. we would consider "moving", "too many aniamls" and "Divorce / Separation" as "owner-side" reason, while "aggression to animal", "too active" and "behavior issue" as "animal-side" reason. Based on 34 recorded reasons, we found 16 can be devoted as "animal-side" reasons while 18 as "owner-side" reasons.
 
