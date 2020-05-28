@@ -1,0 +1,21 @@
+﻿Category,All dog intakes,Returned dogs,Percentage dogs returned,All cat intakes,Returned cats,Percentage cats returned
+Age at adoption,,,,,,
+Less than 1 year,120,14,12%,3072,97,3%
+1-3 years,265,21,8%,1619,87,5%
+3-10 years,356,27,8%,1085,67,6%
+More than 10 years,62,3,5%,50,0,0%
+Age at adoption,,,,,,
+Grant Avenue,201,22,11%,1277,92,7%
+PAC,175,9,5%,1491,72,5%
+PAWS Foster,238,19,8%,1956,31,2%
+Other,189,15,8%,1160,57,5%
+Intake health,,,,,,
+Healthy,698,55,8%,3793,156,4%
+Not healthy,101,10,10%,1501,83,6%
+Less than 7 weeks,4,0,0%,590,13,2%
+Primary Breed,,,,,,
+Pit Bull,162,21,13%,,,
+Chihuahua,120,16,13%,,,
+Mixed,28,4,14%,,,
+Terrier (not pit bull),167,16,10%,,,
+Other,326,34,10%,,,
