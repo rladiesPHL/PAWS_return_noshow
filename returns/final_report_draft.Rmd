@@ -5,15 +5,38 @@ output:
   html_document:
     df_print: paged
   word_document: default
+urlcolor: blue
+  
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Philadelphia Animal Welfare Society (PAWS) is a non-profit organization dedicated to saving Philadelphia’s homeless and at-risk animals. It is the city’s largest rescue partner and provider of low-cost, basic veterinary care for pet owners and rescue organizations that cannot otherwise access or afford it. Through its 3 no-kill shelters, foster care network, and special events, PAWS finds loving homes for thousands of animals each year. 
+[Philadelphia Animal Welfare Society](https://phillypaws.org/) (PAWS) is a non-profit organization dedicated to saving Philadelphia’s homeless and at-risk animals. It is the city’s largest rescue partner and provider of low-cost, basic veterinary care for pet owners and rescue organizations that cannot otherwise access or afford it. Through its 3 no-kill shelters, foster care network, and special events, PAWS finds loving homes for thousands of animals each year. 
 
-R-Ladies Philly has partnered with PAWS to examine trends and patterns in animal returns after initial adoptions and recommend possible solutions to improve the adoption process. Many factors, like the time of year, animal type, age, adopter life decision, etc., can contribute to an animal being returned. 
+[R-Ladies Philly](https://www.rladiesphilly.org/) has partnered with PAWS to examine trends and patterns in animal returns after initial adoptions and recommend possible solutions to improve the adoption process. Many factors, like the time of year, animal type, age, adopter life decision, etc., can contribute to an animal being returned. 
+
+## Executive Summary
+This analysis investigated factors relating to an animal’s adoption process in the PAWS system using PetPoint data from 1/15/2018 to 1/15/2020. The group combined the byAnimal and byPerson datasets and traced each animal's trajectory from intake to outcome. We formulated the data by adoption event per animal and defined adoption outcome as "return" or "no return" and return time as days from adoption to return. Our primary factors of interest included return reasons, animal characteristics (age, size, breed, health), lenght of stay in shelter, adopter geographic patterns and adoption staff experience.
+
+We found:
+
+* PAWS’ return rate in the last 2 years is 6.7% for cats and 10.8% for dogs; while more cats are returned in total, dogs are returned in a higher proportion.
+
+* For both cats and dogs, the first 14 days appear to be particularly critical in determining whether the animal will remain in the home; we recommend weekly contacts with high-risk adopters during this period.
+
+* The majority of returns have to do with a mismatch in expectations regarding owning an animal ("Unrealistic expectation") or a major change in the adopter’s life (e.g., "moving", "change in lifestyle" and "health of owner/family"). Additionally, the first 2 months post-adoption have the highest risk of returns, so targeted education or support services for new adopters could focus on this time period. 
+
+* Animals that are at greater risk to be returned and whose adopters may benefit from a more individualized adoption process are older cats, younger dogs, pit bulls, chihuahuas, and mixed breed dogs, as well as those animals that only spent a short time with PAWS.
+
+* Adopters living outside Philly are less likely to return animals to PAWS (but we cannot rule out that they may be dropped off at another shelter). If adopters in the city do indeed return dogs more frequently, this may suggest that the factors that make an animal a successful city vs. suburban pet are different, and should be taken into account when a match with an adopter is assessed.
+
+* The experience of the staff member handling the adoption contributes to the successful adoption of an animal (but only when the animal was not sick at intake). PAWS may consider additional strategies for assigning experienced staff members to process at-risk animals’ adoptions, as well as more ways to transfer knowledge from experienced adopters.
+
+* Overall, return rates at PAWS are relatively low. The PAWS foster program for cats is particularly successful, with only 2% of cats returned.
+
+\newpage
 
 ## Contributors
 
@@ -32,24 +55,6 @@ Philadelphia (CHOP) where she works with electronic health record (EHR) data on 
 
 We used a dataset extracted from PetPoint, the system used by PAWS to record animal intake and outcome processes from the perspectives of both animal and adopter.  *PetPoint_byAnimal.csv* records the animal information, including animal type, breed, health status, intake date, release date, etc. *PetPoint_byPerson.csv*  stored de-identified adopter data, including adopter gender, postal code, adoption location, etc.
 
-## Executive Summary
-This analysis investigated factors relating to an animal’s adoption process in the PAWS system using PetPoint data from 1/15/2018 to 1/15/2020. The group combined the byAnimal and byPerson datasets and traced each animal's trajectory from intake to outcome. We formulated the data by adoption event per animal and defined adoption outcome as "return" or "no return" and return time as days from adoption to return. Our primary factors of interest included return reasons, animal characteristics (age, size, breed, health), lenght of stay in shelter, adopter geographic patterns and adoption staff experience.
-
-We found:
-
-* PAWS’ return rate in the last 2 years is 6.7% for cats and 10.8% for dogs; while more cats are returned in total, dogs are returned in a higher proportion.
-
-* The majority of returns have to do with a mismatch in expectations regarding owning an animal ("Unrealistic expectation") or a major change in the adopter’s life (e.g., "moving", "change in lifestyle" and "health of owner/family"). Additionally, the first 2 months post-adoption have the highest risk of returns, so targeted education or support services for new adopters could focus on this time period. 
-
-* Animals that are at greater risk to be returned and whose adopters may benefit from a more individualized adoption process are older cats, younger dogs, 
-
-* Pit bulls, chihuahuas, and mixed breed dogs, as well as those animals that only spent a short time with PAWS.
-
-* Adopters living outside Philly are less likely to return animals to PAWS (but we cannot rule out that they may be dropped off at another shelter). If adopters in the city do indeed return dogs more frequently, this may suggest that the factors that make an animal a successful city vs. suburban pet are different, and should be taken into account when a match with an adopter is assessed.
-
-* The experience of the staff member handling the adoption contributes to the successful adoption of an animal (but only when the animal was not sick at intake). PAWS may consider additional strategies for assigning experienced staff members to process at-risk animals’ adoptions, as well as more ways to transfer knowledge from experienced adopters.
-
-* Overall, return rates at PAWS are relatively low. The PAWS foster program for cats is particularly successful, with only 2% of cats returned.
 
 ## Results
 
@@ -61,14 +66,23 @@ The table below shows the number of animals returned, by animal type and age at 
 
 ```{r echo=F, message=F, warning=F}
 library(tidyverse)
+library(gridExtra)
+
 opts <- options(knitr.kable.NA = "")
 sum_df = read_csv("Data/summary_table.csv")
+colnames(sum_df) <-  c("Category", "All dog intakes", "Returned dogs", "% dogs returned",
+                       "All cat intakes", "Returned cats", "% cats returned")
+sum_df$Category[6] <- "Adoption Site"
+
 knitr::kable(
         sum_df,
+        
         "latex",
         booktabs = T
 ) %>% 
-       kableExtra::row_spec(c(1,6,11,15), bold=T)
+  kableExtra::row_spec(c(1,6,11,15), bold=T) %>%
+  kableExtra::column_spec(1, width = "3.5cm") %>%
+  kableExtra::column_spec(2:7, width = "1.5cm")
         # kableExtra::pack_rows("Age at adoption", 1, 4) %>%
         # kableExtra::pack_rows("Location of adoption", 5, 8) %>% 
         # kableExtra::pack_rows("Intake health", 9, 11) %>% 
@@ -76,7 +90,7 @@ knitr::kable(
         
 ```
 
-```{r echo=F, message=F, warning=F}
+```{r echo=F, message=F, warning=F, out.height = "40%"}
 library(tidyverse)
 load("Data/PetPoint_data.Rdata")
 df = left_join(
@@ -97,24 +111,34 @@ df = df %>% ungroup() %>%
         mutate_if(function(x){any(is.na(x))}, function(x){ifelse(is.na(x),0,x)}) %>% 
         gather(key="record_n", value=animal_n, contains("num")) %>% 
         mutate(record_n=as.integer(gsub("num_","",record_n)))
-ggplot(df, aes(x=factor(record_n),y=animal_n, fill=Species)) +
-        geom_bar(stat="identity", position="dodge") +
-        geom_text(aes(label=animal_n), vjust=-0.5, position=position_dodge(0.75)) +
-        xlab("times of returned") +
-        ylab("number of animal")
 ```
 
-The dataset contained 347 return events for which the corresponding adoption date could be traced over the 2-year recording range. They involved 289 animals (232 cats and 57 dogs). Of these 347 return events, we noticed 17 unrealistic return events which happened within 1 hour, with 12 events happening within 5 minutes. We assumed that these events were the result of data entry errors, and chose to remove them from analyses. 
+The data also suggest that most animals that get returned to PAWS only return once, with a very small group of animals (`r round((sum(df$animal_n[df$Species == "Cat" & df$record_n > 1])/sum(df$animal_n[df$Species == "Cat"]))*100, digits=2)`% of cats and `r round((sum(df$animal_n[df$Species == "Dog" & df$record_n > 1])/sum(df$animal_n[df$Species == "Dog"]))*100, digits=2)`% of dogs) being returned more than once. 
 
+```{r, echo = FALSE, fig.height = 3}
+ggplot(df, aes(x=factor(record_n),y=animal_n, fill=Species)) +
+        geom_bar(stat="identity", position="dodge") +
+        geom_text(aes(label=animal_n), vjust=-0.1, position=position_dodge(0.75), size=2.5)  +
+        xlab("Times returned") +
+        ylab("Number of animals") + 
+  ggtitle("Number of times animals returned to PAWS")
+```
+
+The dataset contained 347 return events for which the corresponding adoption date could be traced over the 2-year recording range. They involved 289 animals (232 cats and 57 dogs). Of these 347 return events, we noticed 17 unrealistic return events which happened within 1 hour, with 12 events happening within 5 minutes. We assumed that these events were the result of data entry errors, and chose to remove them from the subsequent analyses. We further focused analyses on the first return event, unless otherwise specified in the analyses. 
 
 ```{r, echo=F, message=F, warning=F}
-return_events = PetPoint_byAnimal %>% 
-        filter(Intake.Type=="Return") %>% 
-        select(Animal.ID, Species, Return.Date = Intake.Date)
+return_events = PetPoint_byAnimal %>%
+  arrange(Animal.ID, Intake.Date) %>%
+  filter(Intake.Type=="Return") %>% 
+  filter(!duplicated(Animal.ID)) %>%
+  select(Animal.ID, Species, Return.Date = Intake.Date)
 
 return_events = left_join(
         PetPoint_byAnimal %>% 
-                select(Animal.ID, Species, Outcome.Date),
+          arrange(Animal.ID, Intake.Date) %>%
+          filter(Intake.Type!="Return") %>% 
+          filter(!duplicated(Animal.ID)) %>%
+          select(Animal.ID, Species, Outcome.Date),
         return_events
 ) %>% filter(!is.na(Return.Date)) %>% 
         mutate(out_shelter_min = difftime(Return.Date,Outcome.Date)) %>% 
@@ -129,17 +153,20 @@ df = return_events %>%
 #         geom_density() +
 #         xlab("days from adoption to return") +
 #         ylab("return event frequency")
+```
 
+```{r, echo = FALSE}
 knitr::kable(
         df %>% filter(days_out_shelter > 1/24) %>% 
-mutate(days_from_adopt_to_return = cut(days_out_shelter,c(0,1,7,14,30,90,180,365,Inf))) %>%
+mutate(days_from_adopt_to_return = cut(days_out_shelter,c(0,1,7,14,30,90,180,365,Inf),
+                                       labels = c("less than 1 day", "1-7 days", "1-2 weeks", "2-4 weeks", 
+                                                  "1-3 months", "3-6 months", "6 months - 1 year", "over 1 year"))) %>%
 group_by(days_from_adopt_to_return) %>% 
 summarise(return_event_number = n_distinct(row_number())) %>% 
         mutate(cumsum_return_event_number = cumsum(return_event_number)),
         booktabs = T,
-        caption = "Days from adoption to return",
-        col.names =  c("Days from adoption to return", "Number of returns", "Cumulative number of returns")
-)
+        caption = "Time from adoption to return",
+        col.names =  c("Time from adoption to return", "Number of returns", "Cumulative number of returns")) 
 
 # plot return dates
 # df2 = df %>% filter(days_out_shelter > 1/24) %>% 
@@ -160,12 +187,56 @@ peak_dog = density_dog$x[which.max(density_dog$y)]
 density_cat=density(df %>% filter(days_out_shelter > 1/24) %>% filter(Species=="Cat") %>% pull(days_out_shelter))
 peak_cat = density_cat$x[which.max(density_cat$y)]
 
-ggplot(df %>% filter(days_out_shelter > 1/24),aes(x=days_out_shelter)) +
+g2 <- ggplot(df %>% filter(days_out_shelter > 1/24),aes(x=days_out_shelter)) +
         geom_density(aes(fill=Species, color=Species), alpha=0.5) +
         geom_vline(data=tibble(xintercept=c(peak_dog,peak_cat), Species=c("Dog","Cat")), aes(xintercept=xintercept, color=Species)) +
-        xlab("days from adoption to return") +
-        ylab("frequency of returns")
+        xlab("Days from adoption to return") +
+        ylab("Frequency of returns")
+
 ```
+
+```{r, echo=F, message=F, warning=F}
+ret = PetPoint_byAnimal %>% 
+  arrange(Animal.ID, Intake.Date) %>%
+  filter(Intake.Type=="Return") %>% 
+  filter(!duplicated(Animal.ID)) %>%
+  select(Animal.ID, Species, Return.Date = Intake.Date)
+  
+
+ret <- left_join(
+        PetPoint_byAnimal %>% 
+          arrange(Animal.ID, Intake.Date) %>%
+          filter(Intake.Type!="Return") %>% 
+          filter(!duplicated(Animal.ID)) %>%
+          select(Animal.ID, Species, Outcome.Date),
+        ret
+) %>% 
+  mutate(out_shelter_min = difftime(Return.Date,Outcome.Date),
+         outcome = ifelse(is.na(Return.Date), 0,1)) %>%
+  filter(outcome == 0 | outcome == 1 & out_shelter_min > 15) %>%
+  mutate(days_out_shelter=as.numeric(out_shelter_min)) %>% 
+  mutate(days_out_shelter=days_out_shelter/(60*24)) %>%
+  filter(outcome == 0 | outcome == 1)
+
+
+library(survival)
+library(survminer)
+library(ggfortify)
+km_fit <- survfit(Surv(days_out_shelter, outcome) ~ Species, data=ret)
+g1 <- autoplot(km_fit) + 
+  ylab("Probability of remaining in the home") + 
+  xlab("Days from adoption")
+# summary(km_fit, times = c(1,2,3,4,5,6,7,14,21,28))
+
+grid.arrange(g2,g1, nrow = 2)
+```
+
+Peak returns were noted at `r round(peak_cat)` days post-adoption for cats and `r round(peak_dog)` days post-adoption for dogs. For both species, the first 14 days appear to be particularly critical in determining whether the animal will remain in the home:
+
+- After 7 days, the likelihood of remaining in the adoptive home dropped to 72% (cats) and 62% (dogs)
+- After 14 days, the likelihood of remaining in the adoptive home dropped to 62% (cats) and 54% (dogs)
+
+Given this, we recommend that at least for high-risk adoptions, adopters be contacted in weeks 1 and 2 post-adoptions to help them manage any situations that might prompt them to return the animal.
 
 ### Return Reasons
 
@@ -212,11 +283,11 @@ ggplot(df %>% filter(), aes(x=order, y=animal_perc, fill=Return.Reason.Group)) +
                 expand = c(0,0)
         ) +
         ylab("Percentage of total returned animal within species (%)")+
-        xlab("Return.Reason") +
+        xlab("Return Reason") +
         theme(legend.position = "bottom")
 ```
 
-Focusing on the animal returned to PAWS multiple times, we hypothesized that those animals were always returned with animal-side reasons. Out of 39 multiple-times-returned animals, only 3 (cat A15451188, A38026544 and A42298667) were returned with always animal-side reasons. Only cat A38026544 was returned for the exactly same reason (Not Housebroken / Housesoiling).
+Focusing on the animals returned to PAWS multiple times, we hypothesized that those animals were always returned with animal-side reasons. Out of 39 multiple-times-returned animals, only 3 (cat A15451188, A38026544 and A42298667) were returned with always animal-side reasons. Only cat A38026544 was returned for the exactly same reason (Not Housebroken / Housesoiling).
 
 All together, these findings suggest that the reasons for returning animals are not largely dependent on animals. "Unrealistic expectation" and adopter life-change (e.g., "moving", "change in lifestyle" and "health of owner/family") are important reasons for animal returning from owner-side.
 
